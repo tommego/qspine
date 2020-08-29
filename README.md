@@ -1,5 +1,5 @@
 # qspine
-spine runtime support for qt qml with spine-cpp 3.x
+spine runtime support for qt qml with [spine-cpp 3.x](https://github.com/EsotericSoftware/spine-runtimes/)
 
 thanks for [spine-qml](https://github.com/irukandji/spine-qml)
 
