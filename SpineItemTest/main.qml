@@ -5,16 +5,9 @@ import QtQuick.Controls 1.4
 
 Window {
     visible: true
-    width: 640
-    height: 480
+    width: 1000
+    height: 700
     title: qsTr("Hello World")
-
-    Rectangle{
-        anchors.fill: mySpine
-        color: "#00000000"
-        border.width: 1
-        border.color: "black"
-    }
 
     SpineItem{
         id: mySpine
