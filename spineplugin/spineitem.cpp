@@ -246,7 +246,7 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
 
         if(texture) {
             if(hasBlend) {
-                cache->cacheTriangleDrawCall();
+//                cache->cacheTriangleDrawCall();
                 switch (engineBlendMode) {
                 case spine::BlendMode_Additive: {
                     cache->blendFunc(GL_ONE, GL_ONE);

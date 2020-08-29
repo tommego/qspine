@@ -49,30 +49,6 @@ struct Point
     GLfloat y;
 };
 
-struct TexCoord {
-    TexCoord(float _u, float _v): u(_u), v(_v) {}
-    TexCoord(): u(0.0f), v(0.0f) {}
-    GLfloat u;
-    GLfloat v;
-};
-
-struct Color
-{
-    Color(GLubyte _r, GLubyte _g, GLubyte _b, GLubyte _a): r(_r), g(_g), b(_b), a(_a){}
-    Color():r(0), g(0), b(0), a(0){}
-    GLubyte r;
-    GLubyte g;
-    GLubyte b;
-    GLubyte a;
-};
-
-struct Vertex
-{
-    Point       position;
-    Color       color;
-    TexCoord    texCoord;
-};
-
 struct SpineVertex{
     float x, y;
 
@@ -116,18 +92,11 @@ public:
     void drawLine(const Point& origin, const Point& destination);
     void drawPoint(const Point& point);
 
-    void cacheTriangleDrawCall();
     void render();
     void setSkeletonRect(const QRectF& rect);
 
 private:
     QList<ICachedGLFunctionCall*> mglFuncs;
-
-    int mCapacity;
-    SpineVertex* m_spineVertices = nullptr;
-    int mVerticesCount;
-    GLushort* mTriangles;
-    int mTrianglesCount;
     QRectF mRect;
 
     QSGTexture* mTexture;

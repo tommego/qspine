@@ -145,20 +145,17 @@ private:
 class DrawTrigngles: public ICachedGLFunctionCall
 {
 public:
-    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, SpineVertex* vertices, const int& numvertices, GLushort* triangles, int trianglesCount)
+    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, GLushort* triangles, int trianglesCount)
         :mShaderProgram(program)
         ,mTexture(texture)
         ,mTriangles(0)
         ,mTrianglesCount(trianglesCount)
     {
+        auto numvertices = vertices.size();
         if (trianglesCount <= 0 || numvertices <= 0 || !triangles)
             return;
         m_vertices.setSize(numvertices, SpineVertex());
-        for(int i = 0; i < numvertices; i++) {
-            const auto& src = vertices[i];
-            auto& dst = m_vertices[i];
-            memcpy(&dst, &src, sizeof (SpineVertex));
-        }
+        memcpy((float*)m_vertices.buffer(), (float*)vertices.buffer(), sizeof (SpineVertex) * numvertices);
 
         mTriangles = new GLushort[trianglesCount];
         memcpy(mTriangles, triangles, sizeof(GLushort)*trianglesCount);
@@ -270,15 +267,8 @@ private:
 };
 
 RenderCmdsCache::RenderCmdsCache()
-    :mCapacity(0)
-    ,mVerticesCount(0)
-    ,mTriangles(0)
-    ,mTrianglesCount(0)
-    ,mTexture(0)
+    :mTexture(nullptr)
 {
-    mCapacity = 2000; // Max number of vertices and triangles per batch.
-    m_spineVertices = new SpineVertex[mCapacity];
-    mTriangles = new GLushort[mCapacity * 3];
 
     mTextureShaderProgram = new QOpenGLShaderProgram();
     bool res = mTextureShaderProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shader/texture.vert");
@@ -310,7 +300,6 @@ RenderCmdsCache::RenderCmdsCache()
 RenderCmdsCache::~RenderCmdsCache()
 {
     clear();
-    delete []mTriangles;
     delete mTextureShaderProgram;
     delete mColorShaderProgram;
 }
@@ -320,7 +309,7 @@ void RenderCmdsCache::clear()
     if (mglFuncs.isEmpty())
         return;
 
-    Q_FOREACH (ICachedGLFunctionCall* func, mglFuncs) {
+    foreach (ICachedGLFunctionCall* func, mglFuncs) {
         func->release();
     }
 
@@ -330,21 +319,7 @@ void RenderCmdsCache::clear()
 void RenderCmdsCache::drawTriangles(QSGTexture* addTexture, spine::Vector<SpineVertex> vertices,
                                     unsigned short* addTriangles, int addTrianglesCount)
 {
-    mTexture = addTexture;
-    mTrianglesCount = addTrianglesCount;
-
-    for (int i = 0; i < addTrianglesCount; i++)
-        mTriangles[i] = addTriangles[i];
-    mVerticesCount = vertices.size();
-
-    for (int i = 0; i < vertices.size(); i ++) {
-        auto& vertex = m_spineVertices[i];
-        vertex.x = vertices[i].x;
-        vertex.y = vertices[i].y;
-        vertex.u = vertices[i].u;
-        vertex.v = vertices[i].v;
-        vertex.color = vertices[i].color;
-    }
+    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, addTriangles, addTrianglesCount));
 }
 
 void RenderCmdsCache::blendFunc(GLenum sfactor, GLenum dfactor)
@@ -388,22 +363,6 @@ void RenderCmdsCache::drawLine(const Point &origin, const Point &destination)
 void RenderCmdsCache::drawPoint(const Point &point)
 {
     mglFuncs.push_back(new DrawPoint(mColorShaderProgram, point));
-}
-
-void RenderCmdsCache::cacheTriangleDrawCall()
-{
-    const bool valid = mVerticesCount>0 && mTrianglesCount > 0;
-    if (!valid){
-        if (mVerticesCount > 0)
-            mVerticesCount = 0;
-        if (mTrianglesCount > 0)
-            mTrianglesCount = 0;
-        return;
-    }
-
-    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, mTexture, m_spineVertices, mVerticesCount, mTriangles, mTrianglesCount));
-    mVerticesCount = 0;
-    mTrianglesCount = 0;
 }
 
 void RenderCmdsCache::render()
