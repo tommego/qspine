@@ -44,7 +44,6 @@ Texture::Texture(const QString& filePath)
     }
 
     mImage = new QImage(filePath);
-    qInfo() << "read image: " << filePath << " : " << mImage->size();
     if (mImage->isNull()){
         qDebug()<<"Texture::Texture Error: image file isNull. Path:"<<filePath;
         delete mImage;
@@ -90,7 +89,6 @@ AimyTextureLoader::~AimyTextureLoader()
 
 void AimyTextureLoader::load(spine::AtlasPage &page, const spine::String &path)
 {
-    qInfo() << "loading texture " << path.buffer();
     if(!QFile::exists(path.buffer())) {
         qWarning() << path.buffer() << " not exists...";
         return;
@@ -119,7 +117,6 @@ AimyExtension::~AimyExtension()
 
 char *AimyExtension::_readFile(const spine::String &path, int *length)
 {
-    qInfo() << "reading file: " << path.buffer();
     QString filePath(path.buffer());
     *length = 0;
     if(!QFile::exists(filePath))
