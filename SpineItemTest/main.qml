@@ -68,6 +68,7 @@ Window {
         spacing: 10
         anchors.right: parent.right
         Item{
+            anchors.right: parent.right
             width: row3.width
             height: 30
             Row{
@@ -88,6 +89,7 @@ Window {
         }
 
         Item{
+            anchors.right: parent.right
             width: row4.width
             height: 30
             Row{
@@ -108,6 +110,7 @@ Window {
         }
 
         Item{
+            anchors.right: parent.right
             width: row5.width
             height: 30
             Row{
@@ -128,6 +131,7 @@ Window {
         }
 
         Item{
+            anchors.right: parent.right
             width: row6.width
             height: 30
             Row{
@@ -143,6 +147,50 @@ Window {
                     stepSize: 0.1
                     value: 1
                     id: defautMixSlider
+                }
+            }
+        }
+
+        Item{
+            anchors.right: parent.right
+            width: row7.width
+            height: 30
+            Row{
+                id: row7
+                spacing: 5
+                Text{
+                    text: "scale x: " + String(mySpine.scaleX)
+                }
+
+                Slider{
+                    minimumValue: -2
+                    maximumValue: 2
+                    stepSize: 0.1
+                    value: 1
+                    id: scaleXSlider
+                    onValueChanged: mySpine.scaleX = value
+                }
+            }
+        }
+
+        Item{
+            anchors.right: parent.right
+            width: row8.width
+            height: 30
+            Row{
+                id: row8
+                spacing: 5
+                Text{
+                    text: "scale y: " + String(mySpine.scaleY)
+                }
+
+                Slider{
+                    minimumValue: -2
+                    maximumValue: 2
+                    stepSize: 0.1
+                    value: 1
+                    id: scaleYSlider
+                    onValueChanged: mySpine.scaleY = value
                 }
             }
         }

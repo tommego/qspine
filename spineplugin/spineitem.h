@@ -37,6 +37,8 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(qreal timeScale READ timeScale WRITE setTimeScale NOTIFY timeScaleChanged)
     Q_PROPERTY(int fps READ fps WRITE setFps NOTIFY fpsChanged)
     Q_PROPERTY(qreal defaultMix READ defaultMix WRITE setDefaultMix NOTIFY defaultMixChanged)
+    Q_PROPERTY(qreal scaleX READ scaleX WRITE setScaleX NOTIFY scaleXChanged)
+    Q_PROPERTY(qreal scaleY READ scaleY WRITE setScaleY NOTIFY scaleYChanged)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -93,6 +95,12 @@ public:
     qreal defaultMix() const;
     void setDefaultMix(const qreal &defaultMix);
 
+    qreal scaleX() const;
+    void setScaleX(const qreal &value);
+
+    qreal scaleY() const;
+    void setScaleY(const qreal &value);
+
 signals:
     void atlasFileChanged(const QUrl& path);
     void skeletonFileChanged(const QUrl& path);
@@ -109,6 +117,8 @@ signals:
     void fpsChanged(const int& fps);
     void timeScaleChanged(const qreal& timesCale);
     void defaultMixChanged(const qreal& defaultMix);
+    void scaleXChanged(const qreal& scaleX);
+    void scaleYChanged(const qreal& scaleY);
 
 protected:
     virtual void timerEvent(QTimerEvent *event) override;
@@ -130,6 +140,8 @@ private:
     bool m_debugBones = false;
     bool m_debugSlots = false;
     bool m_isLoading = false;
+    qreal m_scaleX = 1.0;
+    qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
     int m_fps = 60;
     qreal m_defaultMix = 0.1f;

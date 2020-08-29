@@ -359,6 +359,10 @@ void SpineItem::loadResource()
         m_loaded = false;
         m_animations.clear();
         m_skins.clear();
+        m_scaleX = 1.0;
+        m_scaleY = 1.0;
+        emit scaleXChanged(m_scaleX);
+        emit scaleYChanged(m_scaleY);
         emit animationsChanged(m_animations);
         emit skinsChanged(m_skins);
         emit loadedChanged(m_loaded);
@@ -492,6 +496,32 @@ void SpineItem::releaseSkeletonRelatedData(){
     m_skeleton.reset();
     m_loaded = false;
     m_shouldReleaseCacheTexture = true;
+}
+
+qreal SpineItem::scaleY() const
+{
+    return m_scaleY;
+}
+
+void SpineItem::setScaleY(const qreal &value)
+{
+    m_scaleY = value;
+    if(isSkeletonReady())
+        m_skeleton->setScaleY(m_scaleY);
+    emit scaleYChanged(m_scaleY);
+}
+
+qreal SpineItem::scaleX() const
+{
+    return m_scaleX;
+}
+
+void SpineItem::setScaleX(const qreal &value)
+{
+    m_scaleX = value;
+    if(isSkeletonReady())
+        m_skeleton->setScaleX(m_scaleX);
+    emit scaleXChanged(m_scaleX);
 }
 
 qreal SpineItem::defaultMix() const
