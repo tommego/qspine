@@ -309,9 +309,8 @@ void RenderCmdsCache::clear()
     if (mglFuncs.isEmpty())
         return;
 
-    foreach (ICachedGLFunctionCall* func, mglFuncs) {
+    foreach (ICachedGLFunctionCall* func, mglFuncs)
         func->release();
-    }
 
     mglFuncs.clear();
 }
@@ -374,10 +373,8 @@ void RenderCmdsCache::render()
 
     if (mglFuncs.isEmpty())
         return;
-
-    Q_FOREACH (ICachedGLFunctionCall* func, mglFuncs) {
+    foreach (ICachedGLFunctionCall* func, mglFuncs)
         func->invoke();
-    }
 }
 
 void RenderCmdsCache::setSkeletonRect(const QRectF &rect)
