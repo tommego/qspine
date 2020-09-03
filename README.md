@@ -11,9 +11,9 @@ currently support:
  - real time timescale
  - real time fps
  - real time animation mixing
- - real time skins 
- - real time animation
- - skeleton scale(force to reload)
+ - real time skin setting
+ - real time animation setting
+ - real time skeleton scaling(extractly a global scale of <scaleX, scaleY>)
  - async loading
  - debug bones
  - debug slots
@@ -21,6 +21,6 @@ currently support:
  todo:
  - deug vertices
  - clipping
- - complex blendMode (some errors)
+ - complex blendMode (fixed)
  - animation cache
  - multi threading simulation
