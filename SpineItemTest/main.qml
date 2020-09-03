@@ -11,8 +11,8 @@ Window {
 
     SpineItem{
         id: mySpine
-        atlasFile: "file:///home/beetom/Desktop/justdance/1.atlas"
-        skeletonFile: "file:///home/beetom/Desktop/justdance/1.json"
+        atlasFile: "examples/alien/export/alien-pma.atlas"
+        skeletonFile: "examples/alien/export/alien-ess.json"
         anchors.centerIn: parent
         fps: fpsSlider.value
         skeletonScale: scaleSlider.value

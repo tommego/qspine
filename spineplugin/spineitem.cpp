@@ -246,18 +246,17 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
 
         if(texture) {
             if(hasBlend) {
-//                cache->cacheTriangleDrawCall();
                 switch (engineBlendMode) {
                 case spine::BlendMode_Additive: {
                     cache->blendFunc(GL_ONE, GL_ONE);
                     break;
                 }
                 case spine::BlendMode_Multiply: {
-                    cache->blendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA);
+                    cache->blendFunc(GL_DST_COLOR, GL_ZERO);
                     break;
                 }
                 case spine::BlendMode_Screen: {
-                    cache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
+                    cache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                     break;
                 }
                 default:{
@@ -415,6 +414,8 @@ void SpineItem::loadResource()
             auto skinName = QString(skins[i]->getName().buffer());
             m_skins << skinName;
         }
+        if(m_skins.contains("default"))
+            m_skeleton->setSkin("defualt");
         emit skinsChanged(m_skins);
         m_loaded = true;
         emit isSkeletonReadyChanged(isSkeletonReady());
