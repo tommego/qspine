@@ -11,10 +11,9 @@ Window {
 
     SpineItem{
         id: mySpine
-        atlasFile: "examples/raptor/export/raptor-pma.atlas"
-        skeletonFile: "examples/raptor/export/raptor-pro.json"
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
+        atlasFile: "file:///home/beetom/Desktop/justdance/1.atlas"
+        skeletonFile: "file:///home/beetom/Desktop/justdance/1.json"
+        anchors.centerIn: parent
         fps: fpsSlider.value
         skeletonScale: scaleSlider.value
         timeScale: timeScaleSlider.value

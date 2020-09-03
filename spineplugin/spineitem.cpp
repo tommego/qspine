@@ -387,7 +387,7 @@ void SpineItem::loadResource()
         }
 
         spine::SkeletonJson json(m_atlas.get());
-        json.setScale(m_skeletonScale);
+        json.setScale(1);
         m_skeletonData.reset(json.readSkeletonDataFile(urltospinestring(m_skeletonFile)));
         if(m_skeletonData.isNull()) {
             qWarning() << json.getError().buffer();
@@ -507,7 +507,7 @@ void SpineItem::setScaleY(const qreal &value)
 {
     m_scaleY = value;
     if(isSkeletonReady())
-        m_skeleton->setScaleY(m_scaleY);
+        m_skeleton->setScaleY(m_scaleY * m_skeletonScale);
     emit scaleYChanged(m_scaleY);
 }
 
@@ -520,7 +520,7 @@ void SpineItem::setScaleX(const qreal &value)
 {
     m_scaleX = value;
     if(isSkeletonReady())
-        m_skeleton->setScaleX(m_scaleX);
+        m_skeleton->setScaleX(m_scaleX * m_skeletonScale);
     emit scaleXChanged(m_scaleX);
 }
 
@@ -578,9 +578,13 @@ void SpineItem::setSkeletonScale(const qreal &skeletonScale)
     if(m_isLoading)
         return;
     m_skeletonScale = skeletonScale;
+    if(isSkeletonReady()) {
+        m_skeleton->setScaleX(m_scaleX * m_skeletonScale);
+        m_skeleton->setScaleY(m_scaleY * m_skeletonScale);
+    }
     emit skeletonScaleChanged(m_skeletonScale);
-    m_lazyLoadTimer->stop();
-    m_lazyLoadTimer->start();
+//    m_lazyLoadTimer->stop();
+//    m_lazyLoadTimer->start();
 }
 
 QStringList SpineItem::animations() const
