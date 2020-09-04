@@ -34,37 +34,35 @@
 #include <QtGlobal>
 #include <QSize>
 #include <QString>
+#include <QSGTexture>
 #include <QSharedPointer>
+#include <QMutex>
+#include <QQuickWindow>
 #include <spine/spine.h>
 
 class QImage;
 
-class Texture
+struct Texture
 {
 public:
-    explicit Texture(const QString&);
-    ~Texture();
-
-    QSize   size()const;
-    QString name()const;
-    QImage* image();
-
-private:
-    QImage* mImage;
-    QSize   mSize;
-    QString mName;
+    explicit Texture(const QString& _name):name(_name){}
+    QString name;
 };
 
 class AimyTextureLoader: public spine::TextureLoader{
 public:
     AimyTextureLoader();
     ~AimyTextureLoader() override;
+    static AimyTextureLoader* instance();
     virtual void load(spine::AtlasPage &page, const spine::String &path) override;
     virtual void unload(void *texture) override;
+    QSGTexture* getGLTexture(Texture*texture, QQuickWindow*window);
+    void releaseTextures();
 
 private:
-    QSharedPointer<Texture> m_texture;
-    QList<QSharedPointer<Texture>> m_textures;
+    QHash<QString, QSharedPointer<Texture>> m_textureHash;
+    QHash<QString, QSGTexture*> m_glTextureHash;
+    QMutex m_mutex;
 };
 
 class AimyExtension: public spine::DefaultSpineExtension{

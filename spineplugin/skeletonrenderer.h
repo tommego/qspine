@@ -18,15 +18,10 @@ public:
     virtual void render() override;
     virtual void synchronize(QQuickFramebufferObject * item) override;
 
-    QSGTexture* getGLTexture(Texture*texture, QQuickWindow*window);
-    void releaseTextures();
-
     QSharedPointer<RenderCmdsCache> getCache() const;
 
 private:
-private:
     QSharedPointer<RenderCmdsCache> m_cache;
-    QHash<QString, QSGTexture*> m_textureHash;
 
 };
 

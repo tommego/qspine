@@ -4,6 +4,7 @@
 #include <QtMath>
 #include <QtConcurrent>
 #include <QFile>
+#include <QQuickWindow>
 
 #include "skeletonrenderer.h"
 #include <spine/spine.h>
@@ -16,7 +17,6 @@ spine::String qstringtospinestring(const QString& str) {
 }
 
 spine::String urltospinestring(const QUrl& url) {
-    qDebug() << url.scheme() << url.toString() << url.path();
     auto rcPath = QQmlFile::urlToLocalFileOrQrc(url);
     auto rePath = url.path();
     rePath = rePath.mid(1, rePath.size() - 1);
@@ -31,7 +31,6 @@ spine::String urltospinestring(const QUrl& url) {
 SpineItem::SpineItem(QQuickItem *parent) :
     QQuickFramebufferObject(parent),
     m_skeletonScale(1.0),
-    m_textureLoader(new AimyTextureLoader),
     m_lazyLoadTimer(new QTimer)
 {
     m_lazyLoadTimer->setSingleShot(true);
@@ -43,7 +42,6 @@ SpineItem::SpineItem(QQuickItem *parent) :
 
 SpineItem::~SpineItem()
 {
-    qInfo() << "SpineItem::~SpineItem()";
     releaseSkeletonRelatedData();
     delete [] m_worldVertices;
 }
@@ -65,7 +63,7 @@ void SpineItem::setToSetupPose()
 void SpineItem::setBonesToSetupPose()
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::setBonesToSetupPose Error: Skeleton is not ready";
         return;
     }
     m_skeleton->setBonesToSetupPose();
@@ -74,7 +72,7 @@ void SpineItem::setBonesToSetupPose()
 void SpineItem::setSlotsToSetupPose()
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::setSlotsToSetupPose Error: Skeleton is not ready";
         return;
     }
     m_skeleton->setSlotsToSetupPose();
@@ -83,7 +81,7 @@ void SpineItem::setSlotsToSetupPose()
 bool SpineItem::setAttachment(const QString &slotName, const QString &attachmentName)
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::setAttachment Error: Skeleton is not ready";
         return false;
     }
     m_skeleton->setAttachment(spine::String(slotName.toStdString().data()), spine::String(attachmentName.toStdString().data()));
@@ -93,7 +91,7 @@ bool SpineItem::setAttachment(const QString &slotName, const QString &attachment
 void SpineItem::setMix(const QString &fromAnimation, const QString &toAnimation, float duration)
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::setMix Error: Skeleton is not ready";
         return;
     }
     m_animationStateData->setMix(qstringtospinestring(fromAnimation),
@@ -104,7 +102,7 @@ void SpineItem::setMix(const QString &fromAnimation, const QString &toAnimation,
 void SpineItem::setAnimation(int trackIndex, const QString &name, bool loop)
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::setAnimation Error: Skeleton is not ready";
         return;
     }
     if(!m_animations.contains(name)) {
@@ -117,7 +115,7 @@ void SpineItem::setAnimation(int trackIndex, const QString &name, bool loop)
 void SpineItem::addAnimation(int trackIndex, const QString &name, bool loop, float delay)
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::addAnimation Error: Skeleton is not ready";
         return;
     }
     if(!m_animations.contains(name)) {
@@ -129,6 +127,10 @@ void SpineItem::addAnimation(int trackIndex, const QString &name, bool loop, flo
 
 void SpineItem::setSkin(const QString &skinName)
 {
+    if(!isSkeletonReady()) {
+        qWarning() << "SpineItem::setSkin Error: Skeleton is not ready";
+        return;
+    }
     qInfo() << "setting skin " << skinName;
     if(!m_skins.contains(skinName)) {
         qWarning() <<  "no " << skinName << " found, vailable skins is: " << m_skins;
@@ -139,7 +141,7 @@ void SpineItem::setSkin(const QString &skinName)
 void SpineItem::clearTracks()
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::clearTracks Error: Skeleton is not ready";
         return;
     }
     m_animationState->clearTracks();
@@ -148,7 +150,7 @@ void SpineItem::clearTracks()
 void SpineItem::clearTrack(int trackIndex)
 {
     if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        qWarning() << "SpineItem::clearTrack Error: Skeleton is not ready";
         return;
     }
     m_animationState->clearTrack(size_t(trackIndex));
@@ -168,10 +170,8 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
     if(!renderer)
         return;
 
-    auto* skeletonRenderer = (SkeletonRenderer*)renderer;
     if(m_shouldReleaseCacheTexture) {
         m_shouldReleaseCacheTexture = false;
-        skeletonRenderer->releaseTextures();
     }
 
     cache->setSkeletonRect(m_boundingRect);
@@ -243,7 +243,6 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
             qWarning() << "cliping is not support currenty";
         }
 
-
         if(texture) {
             if(hasBlend) {
                 switch (engineBlendMode) {
@@ -269,7 +268,7 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
                 hasBlend = false;
                 continue;
             }
-            cache->drawTriangles(skeletonRenderer->getGLTexture(texture,window()), vertices, triangles, trianglesCount);
+            cache->drawTriangles( AimyTextureLoader::instance()->getGLTexture(texture,window()), vertices, triangles, trianglesCount);
             hasBlend = true;
         }
 
@@ -378,7 +377,7 @@ void SpineItem::loadResource()
         }
 
         m_atlas = QSharedPointer<spine::Atlas>(new spine::Atlas(urltospinestring(m_atlasFile),
-                                                                m_textureLoader.get()));
+                                                                AimyTextureLoader::instance()));
 
         if(m_atlas->getPages().size() == 0) {
             qWarning() << "Failed to load atlas...";
@@ -401,6 +400,11 @@ void SpineItem::loadResource()
 
         m_animationState.reset(new spine::AnimationState(m_animationStateData.get()));
         m_animationState->setRendererObject(this);
+        m_loaded = true;
+        m_isLoading = false;
+        emit loadedChanged(m_loaded);
+        emit isSkeletonReadyChanged(isSkeletonReady());
+        emit resourceReady();
 
         auto animations = m_skeletonData->getAnimations();
         for(int i = 0; i < animations.size(); i++) {
@@ -417,11 +421,9 @@ void SpineItem::loadResource()
         if(m_skins.contains("default"))
             m_skeleton->setSkin("defualt");
         emit skinsChanged(m_skins);
-        m_loaded = true;
-        emit isSkeletonReadyChanged(isSkeletonReady());
-        emit loadedChanged(m_loaded);
-        emit resourceReady();
-        m_isLoading = false;
+
+        m_skeleton->setScaleX(m_skeletonScale * m_scaleX);
+        m_skeleton->setScaleY(m_skeletonScale * m_scaleY);
     });
 }
 
@@ -443,7 +445,6 @@ void SpineItem::updateSkeletonAnimation()
     m_boundingRect = computeBoundingRect();
     setImplicitSize(m_boundingRect.width(), m_boundingRect.height());
     setSourceSize(QSize(m_boundingRect.width(), m_boundingRect.height()));
-//    setPosition(QPointF(m_boundingRect.left(), -1.0*(m_boundingRect.top() + m_boundingRect.height())));
     update();
 }
 

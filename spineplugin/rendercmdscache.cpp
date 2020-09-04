@@ -127,19 +127,19 @@ private:
 class PointSize: public ICachedGLFunctionCall
 {
 public:
-    explicit PointSize(GLfloat size):mSize(size){}
+    explicit PointSize(GLfloat size):m_size(size){}
     virtual ~PointSize(){}
 
     virtual void invoke(){
 #if defined(Q_OS_OSX)
-        glPointSize(mSize);
+        glPointSize(m_size);
 #elif defined(Q_OS_WIN) && defined(Q_CC_MINGW)
-        glPointSize(mSize);
+        glPointSize(m_size);
 #endif
     }
 
 private:
-    GLfloat mSize;
+    GLfloat m_size;
 };
 
 class DrawTrigngles: public ICachedGLFunctionCall
@@ -148,25 +148,22 @@ public:
     explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, GLushort* triangles, int trianglesCount)
         :mShaderProgram(program)
         ,mTexture(texture)
-        ,mTriangles(0)
-        ,mTrianglesCount(trianglesCount)
     {
         auto numvertices = vertices.size();
         if (trianglesCount <= 0 || numvertices <= 0 || !triangles)
             return;
         m_vertices.setSize(numvertices, SpineVertex());
         memcpy((float*)m_vertices.buffer(), (float*)vertices.buffer(), sizeof (SpineVertex) * numvertices);
-
-        mTriangles = new GLushort[trianglesCount];
-        memcpy(mTriangles, triangles, sizeof(GLushort)*trianglesCount);
+        m_triangles.setSize(trianglesCount, 0);
+        memcpy(m_triangles.buffer(), triangles, sizeof(GLushort)*trianglesCount);
     }
 
     virtual ~DrawTrigngles()
     {
         if(m_vertices.buffer())
             m_vertices.setSize(0, SpineVertex());
-        if (mTriangles)
-            delete []mTriangles;
+        if(m_triangles.buffer())
+            m_triangles.setSize(0, 0);
     }
 
     virtual void invoke()
@@ -178,15 +175,14 @@ public:
         mShaderProgram->setAttributeArray("a_color", GL_FLOAT, &m_vertices[0].color.r, 4, sizeof(SpineVertex));
         mShaderProgram->setAttributeArray("a_texCoord", GL_FLOAT, &m_vertices[0].u, 2, sizeof(SpineVertex));
 
-        glFuncs()->glDrawElements(GL_TRIANGLES, mTrianglesCount, GL_UNSIGNED_SHORT, mTriangles);
+        glFuncs()->glDrawElements(GL_TRIANGLES, m_triangles.size(), GL_UNSIGNED_SHORT, m_triangles.buffer());
     }
 
 private:
     QOpenGLShaderProgram* mShaderProgram;
     spine::Vector<SpineVertex> m_vertices;
+    spine::Vector<GLushort> m_triangles;
     QSGTexture* mTexture;
-    GLushort* mTriangles;
-    int mTrianglesCount = 0;
 };
 
 class DrawPolygon: public ICachedGLFunctionCall
@@ -194,32 +190,29 @@ class DrawPolygon: public ICachedGLFunctionCall
 public:
     explicit DrawPolygon(QOpenGLShaderProgram* program, const Point* points, int pointsCount)
         :mShaderProgram(program)
-        ,mPoints(0)
-        ,mPointsCount(pointsCount)
     {
         if (pointsCount <= 0 || !points)
             return;
 
-        mPoints = new Point[mPointsCount];
-        memcpy(mPoints, points, sizeof(Point)*mPointsCount);
+        m_points.setSize(pointsCount, Point());
+        memcpy(m_points.buffer(), points, sizeof(Point)*pointsCount);
     }
 
     virtual ~DrawPolygon()
     {
-        if (mPoints)
-            delete []mPoints;
+        if(m_points.size() > 0)
+            m_points.setSize(0, Point());
     }
 
     virtual void invoke()
     {
-        mShaderProgram->setAttributeArray("a_position", GL_FLOAT, mPoints, 2, sizeof(Point));
-        glFuncs()->glDrawArrays(GL_LINE_LOOP, 0, (GLsizei) mPointsCount);
+        mShaderProgram->setAttributeArray("a_position", GL_FLOAT, m_points.buffer(), 2, sizeof(Point));
+        glFuncs()->glDrawArrays(GL_LINE_LOOP, 0, (GLsizei) m_points.size());
     }
 
 private:
     QOpenGLShaderProgram* mShaderProgram;
-    Point* mPoints;
-    int mPointsCount;
+    spine::Vector<Point> m_points;
 };
 
 class DrawLine: public ICachedGLFunctionCall

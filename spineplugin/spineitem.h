@@ -3,6 +3,8 @@
 
 #include <QQuickFramebufferObject>
 #include <QElapsedTimer>
+#include <QSGTexture>
+#include <QFuture>
 
 class QTimer;
 
@@ -144,7 +146,7 @@ private:
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
     int m_fps = 60;
-    qreal m_defaultMix = 0.1f;
+    qreal m_defaultMix = 0.1;
     QSize m_sourceSize;
     float* m_worldVertices;
     int m_timerId = 0;
@@ -155,7 +157,6 @@ private:
     QRectF m_boundingRect;
     QElapsedTimer m_timer;
     QSharedPointer<spine::Atlas> m_atlas;
-    QSharedPointer<AimyTextureLoader> m_textureLoader;
     QSharedPointer<spine::SkeletonData> m_skeletonData;
     QSharedPointer<spine::AnimationStateData> m_animationStateData;
     QSharedPointer<spine::AnimationState> m_animationState;

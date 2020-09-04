@@ -34,49 +34,6 @@
 #include <QDebug>
 #include <spine/Extension.h>
 
-Texture::Texture(const QString& filePath)
-    :mImage(0)
-    ,mName(filePath)
-{
-    if (!QFileInfo::exists(filePath)){
-        qDebug()<<"Texture::Texture Error: file not exists. Path:"<<filePath;
-        return;
-    }
-
-    mImage = new QImage(filePath);
-    if (mImage->isNull()){
-        qDebug()<<"Texture::Texture Error: image file isNull. Path:"<<filePath;
-        delete mImage;
-        mImage = 0;
-        return;
-    }
-
-    mSize = mImage->size();
-}
-
-Texture::~Texture()
-{
-    if (mImage) {
-        delete mImage;
-        mImage = 0;
-    }
-}
-
-QSize Texture::size() const
-{
-    return mSize;
-}
-
-QString Texture::name() const
-{
-    return mName;
-}
-
-QImage *Texture::image()
-{
-    return mImage;
-}
-
 AimyTextureLoader::AimyTextureLoader()
 {
 
@@ -84,23 +41,73 @@ AimyTextureLoader::AimyTextureLoader()
 
 AimyTextureLoader::~AimyTextureLoader()
 {
+    releaseTextures();
+}
 
+AimyTextureLoader *AimyTextureLoader::instance()
+{
+    static AimyTextureLoader _instance;
+    return &_instance;
 }
 
 void AimyTextureLoader::load(spine::AtlasPage &page, const spine::String &path)
 {
-    if(!QFile::exists(path.buffer())) {
-        qWarning() << path.buffer() << " not exists...";
+    QMutexLocker locker(&m_mutex);
+    QString filePath(path.buffer());
+
+    if(m_textureHash.contains(filePath)) {
+        auto tex = m_textureHash.value(filePath);
+        page.setRendererObject(tex.get());
         return;
     }
-    auto tex = QSharedPointer<Texture>(new Texture(path.buffer()));
+
+    if(!QFile::exists(filePath)) {
+        qWarning() << filePath << " not exists...";
+        return;
+    }
+    auto tex = QSharedPointer<Texture>(new Texture(filePath));
     page.setRendererObject(tex.get());
-    m_textures << tex;
+    m_textureHash.insert(filePath, tex);
 }
 
 void AimyTextureLoader::unload(void *texture)
 {
     Q_UNUSED(texture)
+}
+
+QSGTexture *AimyTextureLoader::getGLTexture(Texture *texture, QQuickWindow *window)
+{
+    if (!texture || texture->name.isEmpty())
+        return nullptr;
+
+    if (!window)
+        return nullptr;
+
+    if (m_glTextureHash.contains(texture->name))
+        return m_glTextureHash.value(texture->name);
+
+    QImage img(texture->name);
+
+    QSGTexture* tex = window->createTextureFromImage(img);
+    tex->setFiltering(QSGTexture::Linear);
+    tex->setMipmapFiltering(QSGTexture::Linear);
+    m_glTextureHash.insert(texture->name, tex);
+    return tex;
+}
+
+void AimyTextureLoader::releaseTextures()
+{
+    if (m_glTextureHash.isEmpty())
+        return;
+
+    QHashIterator<QString, QSGTexture*> i(m_glTextureHash);
+    while (i.hasNext()) {
+        i.next();
+        if (i.value())
+            delete i.value();
+    }
+
+    m_glTextureHash.clear();
 }
 
 AimyExtension::AimyExtension(): spine::DefaultSpineExtension()
@@ -112,8 +119,6 @@ AimyExtension::~AimyExtension()
 {
 
 }
-
-
 
 char *AimyExtension::_readFile(const spine::String &path, int *length)
 {

@@ -195,4 +195,21 @@ Window {
         }
     }
 
+    Column{
+        Repeater{
+            model: 10
+            SpineItem{
+                atlasFile: "examples/alien/export/alien-pma.atlas"
+                skeletonFile: "examples/alien/export/alien-ess.json"
+                fps: fpsSlider.value
+                skeletonScale: 0.1
+                timeScale: timeScaleSlider.value
+                defaultMix: defautMixSlider.value
+                onAnimationsChanged: {
+                    setAnimation(0, "jump", true);
+                }
+            }
+        }
+    }
+
 }
