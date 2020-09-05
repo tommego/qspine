@@ -20,7 +20,6 @@ currently support:
 
  todo:
  - deug vertices
- - clipping
- - complex blendMode (fixed)
+ - VertexEffect
  - animation cache
  - multi threading simulation
