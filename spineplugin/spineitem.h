@@ -20,6 +20,9 @@ class AnimationStateData;
 class AnimationState;
 class Skeleton;
 class Attachment;
+class SkeletonClipping;
+class Slot;
+class VertexEffect;
 }
 
 class SpineItem : public QQuickFramebufferObject
@@ -134,6 +137,7 @@ private:
     QRectF computeBoundingRect();
     Texture* getTexture(spine::Attachment* attachment) const;
     void releaseSkeletonRelatedData();
+    bool nothingToDraw(spine::Slot& slot);
 
 private:
     QUrl m_atlasFile;
@@ -161,6 +165,8 @@ private:
     QSharedPointer<spine::AnimationStateData> m_animationStateData;
     QSharedPointer<spine::AnimationState> m_animationState;
     QSharedPointer<spine::Skeleton> m_skeleton;
+    QSharedPointer<spine::SkeletonClipping> m_clipper;
+    QSharedPointer<spine::VertexEffect> m_effect;
     QSharedPointer<QTimer> m_lazyLoadTimer;
 };
 
