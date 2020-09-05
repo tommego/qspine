@@ -11,6 +11,7 @@ class QTimer;
 class RenderCmdsCache;
 class AimyTextureLoader;
 class Texture;
+class SpineVertexEffect;
 
 namespace spine {
 class Atlas;
@@ -22,7 +23,6 @@ class Skeleton;
 class Attachment;
 class SkeletonClipping;
 class Slot;
-class VertexEffect;
 }
 
 class SpineItem : public QQuickFramebufferObject
@@ -44,6 +44,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(qreal defaultMix READ defaultMix WRITE setDefaultMix NOTIFY defaultMixChanged)
     Q_PROPERTY(qreal scaleX READ scaleX WRITE setScaleX NOTIFY scaleXChanged)
     Q_PROPERTY(qreal scaleY READ scaleY WRITE setScaleY NOTIFY scaleYChanged)
+    Q_PROPERTY(QObject* vertexEfect READ vertexEfect WRITE setVertexEfect NOTIFY vertexEfectChanged)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -106,6 +107,9 @@ public:
     qreal scaleY() const;
     void setScaleY(const qreal &value);
 
+    QObject *vertexEfect() const;
+    void setVertexEfect(QObject *vertexEfect);
+
 signals:
     void atlasFileChanged(const QUrl& path);
     void skeletonFileChanged(const QUrl& path);
@@ -124,6 +128,7 @@ signals:
     void defaultMixChanged(const qreal& defaultMix);
     void scaleXChanged(const qreal& scaleX);
     void scaleYChanged(const qreal& scaleY);
+    void vertexEfectChanged();
 
 protected:
     virtual void timerEvent(QTimerEvent *event) override;
@@ -166,7 +171,7 @@ private:
     QSharedPointer<spine::AnimationState> m_animationState;
     QSharedPointer<spine::Skeleton> m_skeleton;
     QSharedPointer<spine::SkeletonClipping> m_clipper;
-    QSharedPointer<spine::VertexEffect> m_effect;
+    SpineVertexEffect* m_vertexEfect = nullptr;
     QSharedPointer<QTimer> m_lazyLoadTimer;
 };
 

@@ -245,6 +245,11 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
             }
             triangles = mesh->getTriangles().buffer();
             trianglesCount = mesh->getTriangles().size();
+
+            if (m_vertexEfect) {
+                // todo
+            }
+
         } else if(attachment->getRTTI().isExactly(spine::ClippingAttachment::rtti)) {
             auto clip = (spine::ClippingAttachment*)attachment;
             m_clipper->clipStart(*slot, clip);
@@ -556,6 +561,17 @@ bool SpineItem::nothingToDraw(spine::Slot &slot)
                 return true;
     }
     return false;
+}
+
+QObject *SpineItem::vertexEfect() const
+{
+    return (QObject*)m_vertexEfect;
+}
+
+void SpineItem::setVertexEfect(QObject *vertexEfect)
+{
+    m_vertexEfect = (SpineVertexEffect*)vertexEfect;
+    emit vertexEfectChanged();
 }
 
 qreal SpineItem::scaleY() const

@@ -12,6 +12,7 @@ SOURCES += \
         skeletonrenderer.cpp \
         spineplugin_plugin.cpp \
         spineitem.cpp \
+        spinevertexeffect.cpp \
         texture.cpp
 
 HEADERS += \
@@ -19,6 +20,7 @@ HEADERS += \
         skeletonrenderer.h \
         spineplugin_plugin.h \
         spineitem.h \
+        spinevertexeffect.h \
         texture.h
 
 DISTFILES = qmldir
