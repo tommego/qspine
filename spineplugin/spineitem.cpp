@@ -265,6 +265,49 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
         }
 
         if(texture) {
+            if(m_clipper->isClipping()) {
+
+                auto tmpVerticesCount = vertices.size() * 2;
+                spine::Vector<float> tmpVertices;
+                spine::Vector<float> tmpUvs;
+                tmpVertices.setSize(tmpVerticesCount, 0);
+                tmpUvs.setSize(tmpVerticesCount, 0);
+
+                for(int i = 0; i < vertices.size(); i++) {
+                    tmpVertices[i * 2] = vertices[i].x;
+                    tmpVertices[i * 2 + 1] = vertices[i].y;
+                    tmpUvs[i * 2] = vertices[i].u;
+                    tmpUvs[i * 2 + 1] = vertices[i].v;
+                }
+                m_clipper->clipTriangles(tmpVertices.buffer(), triangles, trianglesCount, tmpUvs.buffer(), sizeof (short));
+                tmpVertices.setSize(0, 0);
+                tmpUvs.setSize(0, 0);
+
+                auto vertCount = m_clipper->getClippedVertices().size() / 2;
+
+                if(m_clipper->getClippedTriangles().size() == 0) {
+                    m_clipper->clipEnd(*slot);
+                    continue;
+                }
+                triangles = m_clipper->getClippedTriangles().buffer();
+                trianglesCount = m_clipper->getClippedTriangles().size();
+                auto newUvs = m_clipper->getClippedUVs();
+                auto newVertices = m_clipper->getClippedVertices();
+                vertices.setSize(vertCount, SpineVertex());
+                for(int i = 0; i < vertCount; i++) {
+                    vertices[i].x = newVertices[i * 2];
+                    vertices[i].y = newVertices[i * 2 + 1];
+                    vertices[i].u = newUvs[i * 2];
+                    vertices[i].v = newUvs[i * 2 + 1];
+                    vertices[i].color.set(tint);
+                }
+            }
+            if(!triangles) {
+                m_clipper->clipEnd(*slot);
+                hasBlend = false;
+                continue;
+            }
+
             if(hasBlend) {
                 switch (engineBlendMode) {
                 case spine::BlendMode_Additive: {
@@ -285,39 +328,12 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
                 }
                 }
             }
-            if(!triangles) {
-                hasBlend = false;
-                continue;
-            }
-
-            if(m_clipper->isClipping()) {
-
-                m_clipper->clipTriangles(&vertices[0].x, triangles, trianglesCount, &vertices[0].u, sizeof (SpineVertex));
-                vertices.setSize(0, SpineVertex());
-                if(m_clipper->getClippedTriangles().size() == 0) {
-                    m_clipper->clipEnd(*slot);
-                    continue;
-                }
-                triangles = m_clipper->getClippedTriangles().buffer();
-                trianglesCount = m_clipper->getClippedTriangles().size();
-                auto newUvs = m_clipper->getClippedUVs();
-                auto newVertices = m_clipper->getClippedVertices();
-                int vertCount = newVertices.size() / 2;
-                vertices.setSize(vertCount, SpineVertex());
-                for(int i = 0; i < vertCount; i++) {
-                    vertices[i].x = newVertices[i * 2];
-                    vertices[i].y = newVertices[i * 2 + 1];
-                    vertices[i].u = newUvs[i * 2];
-                    vertices[i].v = newUvs[i * 2 + 1];
-                    vertices[i].color.set(tint);
-                }
-            }
             cache->drawTriangles( AimyTextureLoader::instance()->getGLTexture(texture,window()), vertices, triangles, trianglesCount);
             hasBlend = true;
             m_clipper->clipEnd(*slot);
         }
-        m_clipper->clipEnd(*slot);
     }
+    m_clipper->clipEnd();
 
     // debug drawing
     if(m_debugBones || m_debugSlots) {
