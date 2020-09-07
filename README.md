@@ -17,9 +17,13 @@ currently support:
  - async loading
  - debug bones
  - debug slots
+ - shared image texture for same image file instance loading
+ - clipping effect
+ 
 
  todo:
  - deug vertices
  - VertexEffect
  - animation cache
  - multi threading simulation
+ - audio trigger
