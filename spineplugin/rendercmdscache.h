@@ -87,7 +87,7 @@ public:
     void pointSize(GLfloat pointSize);
 
     void drawTriangles(QSGTexture* texture, spine::Vector<SpineVertex> vertices,
-                       unsigned short *triangles, int trianglesCount);
+                       unsigned short *triangles, size_t trianglesCount);
     void drawPoly(const Point* points, int pointCount);
     void drawLine(const Point& origin, const Point& destination);
     void drawPoint(const Point& point);

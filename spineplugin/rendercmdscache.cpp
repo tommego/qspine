@@ -145,7 +145,7 @@ private:
 class DrawTrigngles: public ICachedGLFunctionCall
 {
 public:
-    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, GLushort* triangles, int trianglesCount)
+    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, GLushort* triangles, size_t trianglesCount)
         :mShaderProgram(program)
         ,mTexture(texture)
     {
@@ -309,7 +309,7 @@ void RenderCmdsCache::clear()
 }
 
 void RenderCmdsCache::drawTriangles(QSGTexture* addTexture, spine::Vector<SpineVertex> vertices,
-                                    unsigned short* addTriangles, int addTrianglesCount)
+                                    unsigned short* addTriangles, size_t addTrianglesCount)
 {
     mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, addTriangles, addTrianglesCount));
 }

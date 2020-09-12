@@ -66,6 +66,15 @@ void AimyTextureLoader::load(spine::AtlasPage &page, const spine::String &path)
         return;
     }
     auto tex = QSharedPointer<Texture>(new Texture(filePath));
+
+    if(m_window) {
+        QImage img(tex->name);
+        QSGTexture* glTex = m_window->createTextureFromImage(img);
+        glTex->setFiltering(QSGTexture::Linear);
+        glTex->setMipmapFiltering(QSGTexture::Linear);
+        m_glTextureHash.insert(tex->name, glTex);
+    }
+
     page.setRendererObject(tex.get());
     m_textureHash.insert(filePath, tex);
 }
@@ -85,14 +94,9 @@ QSGTexture *AimyTextureLoader::getGLTexture(Texture *texture, QQuickWindow *wind
 
     if (m_glTextureHash.contains(texture->name))
         return m_glTextureHash.value(texture->name);
-
-    QImage img(texture->name);
-
-    QSGTexture* tex = window->createTextureFromImage(img);
-    tex->setFiltering(QSGTexture::Linear);
-    tex->setMipmapFiltering(QSGTexture::Linear);
-    m_glTextureHash.insert(texture->name, tex);
-    return tex;
+    else
+        qWarning() << "no img source found : " << texture->name;
+    return nullptr;
 }
 
 void AimyTextureLoader::releaseTextures()
@@ -108,6 +112,16 @@ void AimyTextureLoader::releaseTextures()
     }
 
     m_glTextureHash.clear();
+}
+
+QQuickWindow *AimyTextureLoader::getWindow() const
+{
+    return m_window;
+}
+
+void AimyTextureLoader::setWindow(QQuickWindow *window)
+{
+    m_window = window;
 }
 
 AimyExtension::AimyExtension(): spine::DefaultSpineExtension()

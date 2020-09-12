@@ -59,10 +59,15 @@ public:
     QSGTexture* getGLTexture(Texture*texture, QQuickWindow*window);
     void releaseTextures();
 
+    QQuickWindow *getWindow() const;
+    void setWindow(QQuickWindow *window);
+
 private:
     QHash<QString, QSharedPointer<Texture>> m_textureHash;
     QHash<QString, QSGTexture*> m_glTextureHash;
+    QHash<QString, QSharedPointer<QImage>> m_imageHash;
     QMutex m_mutex;
+    QQuickWindow* m_window = nullptr;
 };
 
 class AimyExtension: public spine::DefaultSpineExtension{

@@ -34,6 +34,7 @@ SpineItem::SpineItem(QQuickItem *parent) :
     m_lazyLoadTimer(new QTimer),
     m_clipper(new spine::SkeletonClipping)
 {
+    AimyTextureLoader::instance()->setWindow(window());
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(3);
     m_worldVertices = new float[2000];
@@ -136,7 +137,7 @@ void SpineItem::setSkin(const QString &skinName)
     if(!m_skins.contains(skinName)) {
         qWarning() <<  "no " << skinName << " found, vailable skins is: " << m_skins;
     }
-    m_skeleton->setSkin(qstringtospinestring(skinName));
+    m_skeleton->setSkin(skinName.toStdString().c_str());
 }
 
 void SpineItem::clearTracks()
@@ -180,7 +181,7 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
     cache->bindShader(RenderCmdsCache::ShaderTexture);
 
     unsigned short* triangles = nullptr;
-    int trianglesCount = 0;
+    size_t trianglesCount = 0;
     bool hasBlend = false;
 
     for(size_t i = 0, n = m_skeleton->getSlots().size(); i < n; ++i) {
@@ -204,9 +205,6 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
                           skeletonColor.g * slotColor.g,
                           skeletonColor.b * slotColor.b,
                           skeletonColor.a * slotColor.a);
-//        if(tint.a == 0.0f)
-//            continue;
-
         Texture* texture = nullptr;
         triangles = nullptr;
         trianglesCount = 0;
@@ -273,7 +271,7 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
                 tmpVertices.setSize(tmpVerticesCount, 0);
                 tmpUvs.setSize(tmpVerticesCount, 0);
 
-                for(int i = 0; i < vertices.size(); i++) {
+                for(size_t i = 0; i < vertices.size(); i++) {
                     tmpVertices[i * 2] = vertices[i].x;
                     tmpVertices[i * 2 + 1] = vertices[i].y;
                     tmpUvs[i * 2] = vertices[i].u;
@@ -294,7 +292,7 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
                 auto newUvs = m_clipper->getClippedUVs();
                 auto newVertices = m_clipper->getClippedVertices();
                 vertices.setSize(vertCount, SpineVertex());
-                for(int i = 0; i < vertCount; i++) {
+                for(size_t i = 0; i < vertCount; i++) {
                     vertices[i].x = newVertices[i * 2];
                     vertices[i].y = newVertices[i * 2 + 1];
                     vertices[i].u = newUvs[i * 2];
@@ -338,12 +336,13 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
     // debug drawing
     if(m_debugBones || m_debugSlots) {
         cache->bindShader(RenderCmdsCache::ShaderColor);
+        cache->blendFunc(GL_ONE, GL_ONE);
 
         if(m_debugSlots) {
-            cache->drawColor(0, 0, 255, 255);
+            cache->drawColor(0, 100, 0, 255);
             cache->lineWidth(1);
             Point points[4];
-            for (int i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
                 auto slot = m_skeleton->getSlots()[i];
                 if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::RegionAttachment::rtti))
                     continue;
@@ -358,22 +357,23 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer, QShar
         }
 
         if(m_debugBones) {
+//            cache->drawColor(0, 40, 0, 255);
             cache->lineWidth(2);
-            cache->drawColor(255, 0, 0, 255);
-            for(int i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
                 m_skeleton->updateWorldTransform();
-                auto bone = m_skeleton->getDrawOrder()[i]->getBone();
-                float x = bone.getWorldX() + bone.getData().getLength() * cos(bone.getWorldRotationX() * 3.14 / 180.0);
-                float y = bone.getWorldY() - bone.getData().getLength() * cos(bone.getWorldRotationY() * 3.14 / 180.0);
-                Point p0(bone.getWorldX(), bone.getWorldY());
+                auto bone = m_skeleton->getBones()[i];
+                if(!bone->isActive()) continue;
+                float x = bone->getData().getLength() * bone->getA() + bone->getWorldX();
+                float y = bone->getData().getLength() * bone->getC() + bone->getWorldY();
+                Point p0(bone->getWorldX(), bone->getWorldY());
                 Point p1(x, y);
                 cache->drawLine(p0, p1);
             }
+//            cache->drawColor(0, 0, 255, 255);
             cache->pointSize(4.0);
-            cache->drawColor(0, 0, 255, 255);
-            for(int i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
-                auto bone = m_skeleton->getDrawOrder()[i]->getBone();
-                cache->drawPoint(Point(bone.getWorldX(), bone.getWorldY()));
+            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
+                auto bone = m_skeleton->getBones()[i];
+                cache->drawPoint(Point(bone->getWorldX(), bone->getWorldY()));
                 if(i == 0) cache->drawColor(0, 255, 0,255);
             }
         }
@@ -408,6 +408,7 @@ void SpineItem::setSkeletonFile(const QUrl &skeletonPath)
 
 void SpineItem::loadResource()
 {
+    AimyTextureLoader::instance()->setWindow(window());
     m_isLoading = true;
     if(m_timerId > 0) {
         killTimer(m_timerId);
@@ -479,8 +480,8 @@ void SpineItem::loadResource()
             auto skinName = QString(skins[i]->getName().buffer());
             m_skins << skinName;
         }
-        if(m_skins.contains("default"))
-            m_skeleton->setSkin(qstringtospinestring(m_skins.last()));
+//        if(m_skins.contains("default"))
+//            m_skeleton->setSkin(m_skins.last().toStdString().c_str());
         emit skinsChanged(m_skins);
 
         m_skeleton->setScaleX(m_skeletonScale * m_scaleX);
