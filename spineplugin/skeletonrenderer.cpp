@@ -32,7 +32,7 @@ void SkeletonRenderer::synchronize(QQuickFramebufferObject *item)
     if (!animation)
         return;
 
-    animation->renderToCache(this, m_cache);
+    animation->renderToCache(this);
 }
 
 QSharedPointer<RenderCmdsCache> SkeletonRenderer::getCache() const

@@ -65,7 +65,6 @@ public:
 private:
     QHash<QString, QSharedPointer<Texture>> m_textureHash;
     QHash<QString, QSGTexture*> m_glTextureHash;
-    QHash<QString, QSharedPointer<QImage>> m_imageHash;
     QMutex m_mutex;
     QQuickWindow* m_window = nullptr;
 };

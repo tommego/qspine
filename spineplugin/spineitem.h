@@ -6,12 +6,15 @@
 #include <QSGTexture>
 #include <QFuture>
 
+#include "rendercmdscache.h"
+
 class QTimer;
 
 class RenderCmdsCache;
 class AimyTextureLoader;
 class Texture;
 class SpineVertexEffect;
+class SkeletonRenderer;
 
 namespace spine {
 class Atlas;
@@ -24,6 +27,13 @@ class Attachment;
 class SkeletonClipping;
 class Slot;
 }
+
+struct RenderData{
+    spine::Vector<SpineVertex> vertices;
+    spine::Vector<GLushort> triangles;
+    Texture* texture = nullptr;
+    int blendMode;
+};
 
 class SpineItem : public QQuickFramebufferObject
 {
@@ -61,7 +71,9 @@ public:
     Q_INVOKABLE void clearTracks ();
     Q_INVOKABLE void clearTrack(int trackIndex = 0);
 
-    void renderToCache(QQuickFramebufferObject::Renderer* renderer, QSharedPointer<RenderCmdsCache> cache);
+    friend class SpineAnimationWorker;
+
+    void renderToCache(QQuickFramebufferObject::Renderer* renderer);
 
     QUrl atlasFile() const;
     void setAtlasFile(const QUrl &atlasPath);
@@ -134,12 +146,16 @@ signals:
     void animationInterrupted();
     void animationEnded();
     void animationDisposed();
+    void cacheRendered();
+    void animationUpdated();
 
 protected:
     virtual void timerEvent(QTimerEvent *event) override;
 
 private slots:
     void onResourceReady();
+    void updateBoundingRect();
+    void onCacheRendered();
 
 private:
     void loadResource();
@@ -148,6 +164,7 @@ private:
     Texture* getTexture(spine::Attachment* attachment) const;
     void releaseSkeletonRelatedData();
     bool nothingToDraw(spine::Slot& slot);
+    void batchRenderCmd();
 
 private:
     QUrl m_atlasFile;
@@ -178,6 +195,10 @@ private:
     QSharedPointer<spine::SkeletonClipping> m_clipper;
     SpineVertexEffect* m_vertexEfect = nullptr;
     QSharedPointer<QTimer> m_lazyLoadTimer;
+    QElapsedTimer m_tickCounter;
+    spine::Vector<SpineVertex> m_currentVertices;
+    spine::Vector<GLushort> m_currentTriangles;
+    QList<RenderData> m_batches;
 };
 
 #endif // SPINEITEM_H

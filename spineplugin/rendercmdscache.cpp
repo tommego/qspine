@@ -145,17 +145,17 @@ private:
 class DrawTrigngles: public ICachedGLFunctionCall
 {
 public:
-    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, GLushort* triangles, size_t trianglesCount)
+    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, spine::Vector<GLushort> triangles)
         :mShaderProgram(program)
         ,mTexture(texture)
     {
         auto numvertices = vertices.size();
-        if (trianglesCount <= 0 || numvertices <= 0 || !triangles)
+        if (triangles.size() <= 0 || numvertices <= 0 || !triangles.buffer())
             return;
         m_vertices.setSize(numvertices, SpineVertex());
         memcpy((float*)m_vertices.buffer(), (float*)vertices.buffer(), sizeof (SpineVertex) * numvertices);
-        m_triangles.setSize(trianglesCount, 0);
-        memcpy(m_triangles.buffer(), triangles, sizeof(GLushort)*trianglesCount);
+        m_triangles.setSize(triangles.size(), 0);
+        memcpy(m_triangles.buffer(), triangles.buffer(), sizeof(GLushort)*triangles.size());
     }
 
     virtual ~DrawTrigngles()
@@ -309,9 +309,9 @@ void RenderCmdsCache::clear()
 }
 
 void RenderCmdsCache::drawTriangles(QSGTexture* addTexture, spine::Vector<SpineVertex> vertices,
-                                    unsigned short* addTriangles, size_t addTrianglesCount)
+                                    spine::Vector<GLushort> triangles)
 {
-    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, addTriangles, addTrianglesCount));
+    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, triangles));
 }
 
 void RenderCmdsCache::blendFunc(GLenum sfactor, GLenum dfactor)
