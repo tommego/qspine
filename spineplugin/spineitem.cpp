@@ -28,6 +28,39 @@ spine::String urltospinestring(const QUrl& url) {
     return qstringtospinestring(abPath);
 }
 
+void animationSateListioner(spine::AnimationState* state, spine::EventType type, spine::TrackEntry* entry, spine::Event* event) {
+    auto spItem = static_cast<SpineItem*>(state->getRendererObject());
+    if(!spItem)
+        return;
+    QString animationName = QString(entry->getAnimation()->getName().buffer());
+    switch (type) {
+    case spine::EventType_Start:{
+        emit spItem->animationStarted();
+        break;
+    }
+    case spine::EventType_Interrupt: {
+        emit spItem->animationInterrupted();
+        break;
+    }
+    case spine::EventType_End: {
+        emit spItem->animationEnded();
+        break;
+    }
+    case spine::EventType_Complete: {
+        emit spItem->animationCompleted();
+        break;
+    }
+    case spine::EventType_Dispose: {
+        emit spItem->animationDisposed();
+        break;
+    }
+    default:{
+        qWarning() << "unknown event type " << type;
+        break;
+    }
+    }
+}
+
 SpineItem::SpineItem(QQuickItem *parent) :
     QQuickFramebufferObject(parent),
     m_skeletonScale(1.0),
@@ -36,7 +69,7 @@ SpineItem::SpineItem(QQuickItem *parent) :
 {
     AimyTextureLoader::instance()->setWindow(window());
     m_lazyLoadTimer->setSingleShot(true);
-    m_lazyLoadTimer->setInterval(3);
+    m_lazyLoadTimer->setInterval(10);
     m_worldVertices = new float[2000];
     connect(this, &SpineItem::resourceReady, this, &SpineItem::onResourceReady);
     connect(m_lazyLoadTimer.get(), &QTimer::timeout, [=]{releaseSkeletonRelatedData();loadResource();});
@@ -462,6 +495,7 @@ void SpineItem::loadResource()
 
         m_animationState.reset(new spine::AnimationState(m_animationStateData.get()));
         m_animationState->setRendererObject(this);
+        m_animationState->setListener(animationSateListioner);
         m_loaded = true;
         m_isLoading = false;
         emit loadedChanged(m_loaded);

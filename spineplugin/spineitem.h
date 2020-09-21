@@ -129,6 +129,11 @@ signals:
     void scaleXChanged(const qreal& scaleX);
     void scaleYChanged(const qreal& scaleY);
     void vertexEfectChanged();
+    void animationStarted();
+    void animationCompleted();
+    void animationInterrupted();
+    void animationEnded();
+    void animationDisposed();
 
 protected:
     virtual void timerEvent(QTimerEvent *event) override;
