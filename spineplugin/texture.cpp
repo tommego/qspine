@@ -86,11 +86,15 @@ void AimyTextureLoader::unload(void *texture)
 
 QSGTexture *AimyTextureLoader::getGLTexture(Texture *texture, QQuickWindow *window)
 {
-    if (!texture || texture->name.isEmpty())
+    if (!texture || texture->name.isEmpty()) {
+        qWarning() << "texture name is empty " << texture->name;
         return nullptr;
+    }
 
-    if (!window)
+    if (!window) {
+        qWarning() << "window is invalid " << window;
         return nullptr;
+    }
 
     if (m_glTextureHash.contains(texture->name))
         return m_glTextureHash.value(texture->name);

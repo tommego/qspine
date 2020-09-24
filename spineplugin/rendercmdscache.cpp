@@ -34,6 +34,8 @@
 #include <QSGTexture>
 #include <QOpenGLShaderProgram>
 
+#include "spineitem.h"
+
 void ICachedGLFunctionCall::release()
 {
     delete this;
@@ -259,45 +261,20 @@ private:
     Point mPoint;
 };
 
-RenderCmdsCache::RenderCmdsCache()
-    :mTexture(nullptr)
+RenderCmdsCache::RenderCmdsCache(SpineItem* spItem)
+    : mTexture(nullptr),
+      m_spItem(spItem)
 {
-
-    mTextureShaderProgram = new QOpenGLShaderProgram();
-    bool res = mTextureShaderProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shader/texture.vert");
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mTextureShaderProgram->log();
-
-    res = mTextureShaderProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shader/texture.frag");
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mTextureShaderProgram->log();
-
-    res = mTextureShaderProgram->link();
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program link error:"<<mTextureShaderProgram->log();
-
-    mColorShaderProgram = new QOpenGLShaderProgram();
-    res = mColorShaderProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shader/color.vert");
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mColorShaderProgram->log();
-
-    res = mColorShaderProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shader/color.frag");
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mColorShaderProgram->log();
-
-    res = mColorShaderProgram->link();
-    if (!res)
-        qDebug()<<"PolygonBatch::PolygonBatch texture shader program link error:"<<mColorShaderProgram->log();
 }
 
 RenderCmdsCache::~RenderCmdsCache()
 {
-    clear();
+    clearCache();
     delete mTextureShaderProgram;
     delete mColorShaderProgram;
 }
 
-void RenderCmdsCache::clear()
+void RenderCmdsCache::clearCache()
 {
     if (mglFuncs.isEmpty())
         return;
@@ -364,14 +341,54 @@ void RenderCmdsCache::render()
     glFuncs->glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glFuncs->glClear(GL_COLOR_BUFFER_BIT);
 
-    if (mglFuncs.isEmpty())
+    if (mglFuncs.isEmpty()) {
+        emit m_spItem->cacheRendered();
         return;
+    }
     foreach (ICachedGLFunctionCall* func, mglFuncs)
         func->invoke();
+    emit m_spItem->cacheRendered();
 }
 
 void RenderCmdsCache::setSkeletonRect(const QRectF &rect)
 {
     mRect = rect;
+}
+
+void RenderCmdsCache::initShaderProgram()
+{
+    if(m_shaderInited)
+        return;
+    mTextureShaderProgram = new QOpenGLShaderProgram();
+    bool res = mTextureShaderProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shader/texture.vert");
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mTextureShaderProgram->log();
+
+    res = mTextureShaderProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shader/texture.frag");
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mTextureShaderProgram->log();
+
+    res = mTextureShaderProgram->link();
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program link error:"<<mTextureShaderProgram->log();
+
+    mColorShaderProgram = new QOpenGLShaderProgram();
+    res = mColorShaderProgram->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/shader/color.vert");
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mColorShaderProgram->log();
+
+    res = mColorShaderProgram->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/shader/color.frag");
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program addShaderFromSourceCode error:"<<mColorShaderProgram->log();
+
+    res = mColorShaderProgram->link();
+    if (!res)
+        qDebug()<<"PolygonBatch::PolygonBatch texture shader program link error:"<<mColorShaderProgram->log();
+    m_shaderInited = true;
+}
+
+bool RenderCmdsCache::isValid()
+{
+    return m_shaderInited;
 }
 

@@ -5,8 +5,7 @@
 #include "texture.h"
 #include <QQuickWindow>
 
-SkeletonRenderer::SkeletonRenderer():
-    m_cache(new RenderCmdsCache)
+SkeletonRenderer::SkeletonRenderer()
 {
 }
 
@@ -23,6 +22,8 @@ QOpenGLFramebufferObject *SkeletonRenderer::createFramebufferObject(const QSize 
 
 void SkeletonRenderer::render()
 {
+    if(m_cache.isNull())
+        return;
     m_cache->render();
 }
 
@@ -38,4 +39,9 @@ void SkeletonRenderer::synchronize(QQuickFramebufferObject *item)
 QSharedPointer<RenderCmdsCache> SkeletonRenderer::getCache() const
 {
     return m_cache;
+}
+
+void SkeletonRenderer::setCache(const QSharedPointer<RenderCmdsCache> &cache)
+{
+    m_cache = cache;
 }

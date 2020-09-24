@@ -20,6 +20,8 @@ public:
 
     QSharedPointer<RenderCmdsCache> getCache() const;
 
+    void setCache(const QSharedPointer<RenderCmdsCache> &cache);
+
 private:
     QSharedPointer<RenderCmdsCache> m_cache;
 

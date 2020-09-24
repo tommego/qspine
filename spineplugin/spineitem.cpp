@@ -65,27 +65,37 @@ SpineItem::SpineItem(QQuickItem *parent) :
     QQuickFramebufferObject(parent),
     m_skeletonScale(1.0),
     m_clipper(new spine::SkeletonClipping),
-    m_lazyLoadTimer(new QTimer)
+    m_lazyLoadTimer(new QTimer),
+    m_renderCache(new RenderCmdsCache(this)),
+    m_spWorker(new SpineItemWorker(nullptr, this)),
+    m_spWorkerThread(new QThread)
 {
     AimyTextureLoader::instance()->setWindow(window());
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(50);
     m_worldVertices = new float[2000];
-    connect(this, &SpineItem::resourceReady, this, &SpineItem::onResourceReady);
+    connect(this, &SpineItem::resourceReady, this, &SpineItem::onAnythingReady);
     connect(m_lazyLoadTimer.get(), &QTimer::timeout, [=]{releaseSkeletonRelatedData();loadResource();});
     connect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
     connect(this, &SpineItem::cacheRendered, this, &SpineItem::onCacheRendered);
+    m_spWorker->moveToThread(m_spWorkerThread.get());
+    m_spWorkerThread->start();
 }
 
 SpineItem::~SpineItem()
 {
+    m_spWorkerThread->terminate();
+    m_spWorkerThread->wait();
     releaseSkeletonRelatedData();
     delete [] m_worldVertices;
 }
 
 QQuickFramebufferObject::Renderer *SpineItem::createRenderer() const
 {
-    return new SkeletonRenderer();
+    auto renderer = new SkeletonRenderer();
+    m_renderCache->initShaderProgram();
+    renderer->setCache(m_renderCache);
+    return renderer;
 }
 
 void SpineItem::setToSetupPose()
@@ -197,102 +207,7 @@ static unsigned short quadIndices[] = {0, 1, 2, 2, 3, 0};
 
 void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
 {
-    auto spRenderer = static_cast<SkeletonRenderer*>(renderer);
-    if(!spRenderer)
-        return;
-    auto cache = spRenderer->getCache();
-    if(!isSkeletonReady())
-        return;
-
-    if(cache.isNull())
-        return;
-    cache->clear();
-
-    if(m_shouldReleaseCacheTexture) {
-        m_shouldReleaseCacheTexture = false;
-    }
-
-    cache->setSkeletonRect(m_boundingRect);
-
-    cache->bindShader(RenderCmdsCache::ShaderTexture);
-
-    bool hasBlend = false;
-    foreach(const auto& batch, m_batches) {
-        if(batch.triangles.size() == 0) {
-            hasBlend = false;
-            continue;
-        }
-
-        if(hasBlend) {
-            switch (batch.blendMode) {
-            case spine::BlendMode_Additive: {
-                cache->blendFunc(GL_ONE, GL_ONE);
-                break;
-            }
-            case spine::BlendMode_Multiply: {
-                cache->blendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
-                break;
-            }
-            case spine::BlendMode_Screen: {
-                cache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                break;
-            }
-            default:{
-                cache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-                break;
-            }
-            }
-        }
-        cache->drawTriangles( AimyTextureLoader::instance()->getGLTexture(batch.texture, window()), batch.vertices, batch.triangles);
-        hasBlend = true;
-    }
-
-    // debug drawing
-    if(m_debugBones || m_debugSlots) {
-        cache->bindShader(RenderCmdsCache::ShaderColor);
-        cache->blendFunc(GL_ONE, GL_ONE);
-
-        if(m_debugSlots) {
-            cache->drawColor(0, 100, 0, 255);
-            cache->lineWidth(1);
-            Point points[4];
-            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
-                auto slot = m_skeleton->getSlots()[i];
-                if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::RegionAttachment::rtti))
-                    continue;
-                auto* regionAttachment = (spine::RegionAttachment*)slot->getAttachment();
-                regionAttachment->computeWorldVertices(slot->getBone(), m_worldVertices, 0, 2);
-                points[0] = Point(m_worldVertices[0], m_worldVertices[1]);
-                points[1] = Point(m_worldVertices[2], m_worldVertices[3]);
-                points[2] = Point(m_worldVertices[4], m_worldVertices[5]);
-                points[3] = Point(m_worldVertices[6], m_worldVertices[7]);
-                cache->drawPoly(points, 4);
-            }
-        }
-
-        if(m_debugBones) {
-//            cache->drawColor(0, 40, 0, 255);
-            cache->lineWidth(2);
-            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
-                m_skeleton->updateWorldTransform();
-                auto bone = m_skeleton->getBones()[i];
-                if(!bone->isActive()) continue;
-                float x = bone->getData().getLength() * bone->getA() + bone->getWorldX();
-                float y = bone->getData().getLength() * bone->getC() + bone->getWorldY();
-                Point p0(bone->getWorldX(), bone->getWorldY());
-                Point p1(x, y);
-                cache->drawLine(p0, p1);
-            }
-//            cache->drawColor(0, 0, 255, 255);
-            cache->pointSize(4.0);
-            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
-                auto bone = m_skeleton->getBones()[i];
-                cache->drawPoint(Point(bone->getWorldX(), bone->getWorldY()));
-                if(i == 0) cache->drawColor(0, 255, 0,255);
-            }
-        }
-    }
-    emit cacheRendered();
+    Q_UNUSED(renderer)
 }
 
 QUrl SpineItem::atlasFile() const
@@ -323,115 +238,12 @@ void SpineItem::setSkeletonFile(const QUrl &skeletonPath)
 
 void SpineItem::loadResource()
 {
-    AimyTextureLoader::instance()->setWindow(window());
-    m_isLoading = true;
-    if(m_timerId > 0) {
-        killTimer(m_timerId);
-        m_timerId = 0;
-    }
-
-    QtConcurrent::run([=]{
-        m_loaded = false;
-        m_animations.clear();
-        m_skins.clear();
-        m_scaleX = 1.0;
-        m_scaleY = 1.0;
-        emit scaleXChanged(m_scaleX);
-        emit scaleYChanged(m_scaleY);
-        emit animationsChanged(m_animations);
-        emit skinsChanged(m_skins);
-        emit loadedChanged(m_loaded);
-        emit isSkeletonReadyChanged(isSkeletonReady());
-
-        if(m_atlasFile.isEmpty() || !m_atlasFile.isValid()) {
-            qWarning() << m_atlasFile << " not exists...";
-            return;
-        }
-
-        if(m_skeletonFile.isEmpty() || !m_skeletonFile.isValid()) {
-            qWarning() << m_skeletonFile << " not exists...";
-            return;
-        }
-
-        m_atlas = QSharedPointer<spine::Atlas>(new spine::Atlas(urltospinestring(m_atlasFile),
-                                                                AimyTextureLoader::instance()));
-
-        if(m_atlas->getPages().size() == 0) {
-            qWarning() << "Failed to load atlas...";
-            return;
-        }
-
-        spine::SkeletonJson json(m_atlas.get());
-        json.setScale(1);
-        m_skeletonData.reset(json.readSkeletonDataFile(urltospinestring(m_skeletonFile)));
-        if(m_skeletonData.isNull()) {
-            qWarning() << json.getError().buffer();
-            return;
-        }
-
-        m_skeleton.reset(new spine::Skeleton(m_skeletonData.get()));
-        m_skeleton->setX(0);
-        m_skeleton->setY(0);
-        m_animationStateData.reset(new spine::AnimationStateData(m_skeletonData.get()));
-        m_animationStateData->setDefaultMix(m_defaultMix);
-
-        m_animationState.reset(new spine::AnimationState(m_animationStateData.get()));
-        m_animationState->setRendererObject(this);
-        m_animationState->setListener(animationSateListioner);
-        m_loaded = true;
-        m_isLoading = false;
-        emit loadedChanged(m_loaded);
-        emit isSkeletonReadyChanged(isSkeletonReady());
-        emit resourceReady();
-
-        auto animations = m_skeletonData->getAnimations();
-        for(int i = 0; i < animations.size(); i++) {
-            auto aniName = QString(animations[i]->getName().buffer());
-            m_animations << aniName;
-        }
-        emit animationsChanged(m_animations);
-
-        auto skins = m_skeletonData->getSkins();
-        for(int i = 0; i < skins.size(); i++) {
-            auto skinName = QString(skins[i]->getName().buffer());
-            m_skins << skinName;
-        }
-//        if(m_skins.contains("default"))
-//            m_skeleton->setSkin(m_skins.last().toStdString().c_str());
-        emit skinsChanged(m_skins);
-
-        m_skeleton->setScaleX(m_skeletonScale * m_scaleX);
-        m_skeleton->setScaleY(m_skeletonScale * m_scaleY);
-    });
+    QMetaObject::invokeMethod(m_spWorker.get(), "loadResource");
 }
 
 void SpineItem::updateSkeletonAnimation()
 {
-    if(!isSkeletonReady())
-        return;
-
-    if(!m_tickCounter.isValid())
-        m_tickCounter.restart();
-    else{
-        if(m_tickCounter.elapsed() <  (1000.0 / m_fps)) {
-            emit animationUpdated();
-            return;
-        }
-    }
-    m_tickCounter.restart();
-
-    qint64 msecs = 0;
-    if(!m_timer.isValid())
-        m_timer.start();
-    else
-        msecs = m_timer.restart();
-    const float deltaTime = msecs / 1000.0 * m_timeScale;
-    m_animationState->update(deltaTime);
-    m_animationState->apply(*m_skeleton.get());
-    m_skeleton->updateWorldTransform();
-
-    m_boundingRect = computeBoundingRect();
-    emit animationUpdated();
+    QMetaObject::invokeMethod(m_spWorker.get(), "updateSkeletonAnimation");
 }
 
 QRectF SpineItem::computeBoundingRect()
@@ -506,9 +318,18 @@ bool SpineItem::nothingToDraw(spine::Slot &slot)
 
 void SpineItem::batchRenderCmd()
 {
+    if(!m_renderCache || !m_renderCache->isValid())
+        return;
 
     // batching
+    m_renderCache->clearCache();
+    m_renderCache->setSkeletonRect(m_boundingRect);
     m_batches.clear();
+
+    m_renderCache->bindShader(RenderCmdsCache::ShaderTexture);
+
+    bool hasBlend = false;
+
     for(size_t i = 0, n = m_skeleton->getSlots().size(); i < n; ++i) {
         auto slot = m_skeleton->getDrawOrder()[i];
 
@@ -627,11 +448,86 @@ void SpineItem::batchRenderCmd()
             if(batch.triangles.size() == 0)
                 m_clipper->clipEnd(*slot);
             batch.texture = texture;
-            m_batches << batch;
             m_clipper->clipEnd(*slot);
+
+            if(batch.triangles.size() == 0) {
+                hasBlend = false;
+                continue;
+            }
+
+            if(hasBlend) {
+                switch (batch.blendMode) {
+                case spine::BlendMode_Additive: {
+                    m_renderCache->blendFunc(GL_ONE, GL_ONE);
+                    break;
+                }
+                case spine::BlendMode_Multiply: {
+                    m_renderCache->blendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
+                    break;
+                }
+                case spine::BlendMode_Screen: {
+                    m_renderCache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                    break;
+                }
+                default:{
+                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                    break;
+                }
+                }
+            }
+            m_batches << batch;
+            m_renderCache->drawTriangles( AimyTextureLoader::instance()->getGLTexture(batch.texture, window()), batch.vertices, batch.triangles);
+            hasBlend = true;
+            m_clipper->clipEnd();
         }
     }
     m_clipper->clipEnd();
+
+    // debug drawing
+    if(m_debugBones || m_debugSlots) {
+        m_renderCache->bindShader(RenderCmdsCache::ShaderColor);
+        m_renderCache->blendFunc(GL_ONE, GL_ONE);
+
+        if(m_debugSlots) {
+            m_renderCache->drawColor(0, 100, 0, 255);
+            m_renderCache->lineWidth(1);
+            Point points[4];
+            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+                auto slot = m_skeleton->getSlots()[i];
+                if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::RegionAttachment::rtti))
+                    continue;
+                auto* regionAttachment = (spine::RegionAttachment*)slot->getAttachment();
+                regionAttachment->computeWorldVertices(slot->getBone(), m_worldVertices, 0, 2);
+                points[0] = Point(m_worldVertices[0], m_worldVertices[1]);
+                points[1] = Point(m_worldVertices[2], m_worldVertices[3]);
+                points[2] = Point(m_worldVertices[4], m_worldVertices[5]);
+                points[3] = Point(m_worldVertices[6], m_worldVertices[7]);
+                m_renderCache->drawPoly(points, 4);
+            }
+        }
+
+        if(m_debugBones) {
+//            cache->drawColor(0, 40, 0, 255);
+            m_renderCache->lineWidth(2);
+            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
+                m_skeleton->updateWorldTransform();
+                auto bone = m_skeleton->getBones()[i];
+                if(!bone->isActive()) continue;
+                float x = bone->getData().getLength() * bone->getA() + bone->getWorldX();
+                float y = bone->getData().getLength() * bone->getC() + bone->getWorldY();
+                Point p0(bone->getWorldX(), bone->getWorldY());
+                Point p1(x, y);
+                m_renderCache->drawLine(p0, p1);
+            }
+//            cache->drawColor(0, 0, 255, 255);
+            m_renderCache->pointSize(4.0);
+            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
+                auto bone = m_skeleton->getBones()[i];
+                m_renderCache->drawPoint(Point(bone->getWorldX(), bone->getWorldY()));
+                if(i == 0) m_renderCache->drawColor(0, 255, 0,255);
+            }
+        }
+    }
 }
 
 QObject *SpineItem::vertexEfect() const
@@ -777,15 +673,9 @@ void SpineItem::setSourceSize(const QSize &sourceSize)
     emit sourceSizeChanged(m_sourceSize);
 }
 
-void SpineItem::timerEvent(QTimerEvent *event)
+void SpineItem::onAnythingReady()
 {
-    if(m_timerId == event->timerId())
-        updateSkeletonAnimation();
-}
-
-void SpineItem::onResourceReady()
-{
-    QtConcurrent::run([=]{ updateSkeletonAnimation(); });
+    updateSkeletonAnimation();
 }
 
 void SpineItem::updateBoundingRect()
@@ -797,13 +687,128 @@ void SpineItem::updateBoundingRect()
 
 void SpineItem::onCacheRendered()
 {
-    QtConcurrent::run([=]{
-        updateSkeletonAnimation();
-        batchRenderCmd();
-    });
+    updateSkeletonAnimation();
 }
 
 bool SpineItem::isSkeletonReady() const
 {
     return m_loaded && m_atlas && m_skeleton && m_animationState;
+}
+
+SpineItemWorker::SpineItemWorker(QObject *parent, SpineItem *spItem) :
+    QObject(parent),
+    m_spItem(spItem)
+{
+
+}
+
+void SpineItemWorker::updateSkeletonAnimation()
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::updateSkeletonAnimation(): skeleton is not ready";
+        return;
+    }
+
+    if(!m_spItem->m_tickCounter.isValid())
+        m_spItem->m_tickCounter.restart();
+    else{
+        auto sleepCount = 1000.0 / m_spItem->m_fps - m_spItem->m_tickCounter.elapsed();
+        if(sleepCount > 0)
+            QThread::msleep(sleepCount);
+    }
+    m_spItem->m_tickCounter.restart();
+
+    qint64 msecs = 0;
+    if(!m_spItem->m_timer.isValid())
+        m_spItem->m_timer.start();
+    else
+        msecs = m_spItem->m_timer.restart();
+    const float deltaTime = msecs / 1000.0 * m_spItem->m_timeScale;
+    m_spItem->m_animationState->update(deltaTime);
+    m_spItem->m_animationState->apply(*m_spItem->m_skeleton.get());
+    m_spItem->m_skeleton->updateWorldTransform();
+
+    m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
+    m_spItem->batchRenderCmd();
+    emit m_spItem->animationUpdated();
+}
+
+void SpineItemWorker::loadResource()
+{
+    AimyTextureLoader::instance()->setWindow(m_spItem->window());
+    m_spItem->m_isLoading = true;
+
+    m_spItem->m_loaded = false;
+    m_spItem->m_animations.clear();
+    m_spItem->m_skins.clear();
+    m_spItem->m_scaleX = 1.0;
+    m_spItem->m_scaleY = 1.0;
+    emit m_spItem->scaleXChanged(m_spItem->m_scaleX);
+    emit m_spItem->scaleYChanged(m_spItem->m_scaleY);
+    emit m_spItem->animationsChanged(m_spItem->m_animations);
+    emit m_spItem->skinsChanged(m_spItem->m_skins);
+    emit m_spItem->loadedChanged(m_spItem->m_loaded);
+    emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());
+
+    if(m_spItem->m_atlasFile.isEmpty() || !m_spItem->m_atlasFile.isValid()) {
+        qWarning() << m_spItem->m_atlasFile << " not exists...";
+        return;
+    }
+
+    if(m_spItem->m_skeletonFile.isEmpty() || !m_spItem->m_skeletonFile.isValid()) {
+        qWarning() << m_spItem->m_skeletonFile << " not exists...";
+        return;
+    }
+
+    m_spItem->m_atlas.reset(new spine::Atlas(urltospinestring(m_spItem->m_atlasFile),
+                                   AimyTextureLoader::instance()));
+
+    if(m_spItem->m_atlas->getPages().size() == 0) {
+        qWarning() << "Failed to load atlas...";
+        return;
+    }
+
+    spine::SkeletonJson json(m_spItem->m_atlas.get());
+    json.setScale(1);
+    m_spItem->m_skeletonData.reset(json.readSkeletonDataFile(urltospinestring(m_spItem->m_skeletonFile)));
+    if(m_spItem->m_skeletonData.isNull()) {
+        qWarning() << json.getError().buffer();
+        return;
+    }
+
+    m_spItem->m_skeleton.reset(new spine::Skeleton(m_spItem->m_skeletonData.get()));
+    m_spItem->m_skeleton->setX(0);
+    m_spItem->m_skeleton->setY(0);
+    m_spItem->m_animationStateData.reset(new spine::AnimationStateData(m_spItem->m_skeletonData.get()));
+    m_spItem->m_animationStateData->setDefaultMix(m_spItem->m_defaultMix);
+
+    m_spItem->m_animationState.reset(new spine::AnimationState(m_spItem->m_animationStateData.get()));
+    m_spItem->m_animationState->setRendererObject(this);
+    m_spItem->m_animationState->setListener(animationSateListioner);
+    m_spItem->m_loaded = true;
+    m_spItem->m_isLoading = false;
+
+    auto animations = m_spItem->m_skeletonData->getAnimations();
+    for(int i = 0; i < animations.size(); i++) {
+        auto aniName = QString(animations[i]->getName().buffer());
+        m_spItem->m_animations << aniName;
+    }
+    emit m_spItem->animationsChanged(m_spItem->m_animations);
+
+    auto skins = m_spItem->m_skeletonData->getSkins();
+    for(int i = 0; i < skins.size(); i++) {
+        auto skinName = QString(skins[i]->getName().buffer());
+        m_spItem->m_skins << skinName;
+    }
+//        if(m_skins.contains("default"))
+//            m_skeleton->setSkin(m_skins.last().toStdString().c_str());
+    emit m_spItem->skinsChanged(m_spItem->m_skins);
+
+    m_spItem->m_skeleton->setScaleX(m_spItem->m_skeletonScale * m_spItem->m_scaleX);
+    m_spItem->m_skeleton->setScaleY(m_spItem->m_skeletonScale * m_spItem->m_scaleY);
+
+    m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
+    emit m_spItem->loadedChanged(m_spItem->m_loaded);
+    emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());
+    emit m_spItem->resourceReady();
 }

@@ -8,6 +8,8 @@
 
 #include "rendercmdscache.h"
 
+class SpineItemWorker;
+
 class QTimer;
 
 class RenderCmdsCache;
@@ -71,7 +73,7 @@ public:
     Q_INVOKABLE void clearTracks ();
     Q_INVOKABLE void clearTrack(int trackIndex = 0);
 
-    friend class SpineAnimationWorker;
+    friend class SpineItemWorker;
 
     void renderToCache(QQuickFramebufferObject::Renderer* renderer);
 
@@ -149,11 +151,8 @@ signals:
     void cacheRendered();
     void animationUpdated();
 
-protected:
-    virtual void timerEvent(QTimerEvent *event) override;
-
 private slots:
-    void onResourceReady();
+    void onAnythingReady();
     void updateBoundingRect();
     void onCacheRendered();
 
@@ -180,7 +179,6 @@ private:
     qreal m_defaultMix = 0.1;
     QSize m_sourceSize;
     float* m_worldVertices;
-    int m_timerId = 0;
     bool m_shouldReleaseCacheTexture = false;
     qreal m_skeletonScale;
     QStringList m_animations;
@@ -198,7 +196,23 @@ private:
     QElapsedTimer m_tickCounter;
     spine::Vector<SpineVertex> m_currentVertices;
     spine::Vector<GLushort> m_currentTriangles;
+    QSharedPointer<RenderCmdsCache> m_renderCache;
     QList<RenderData> m_batches;
+    QSharedPointer<SpineItemWorker> m_spWorker;
+    QSharedPointer<QThread> m_spWorkerThread;
+};
+
+class SpineItemWorker: public QObject{
+    Q_OBJECT
+public:
+    SpineItemWorker(QObject* parent = nullptr, SpineItem* spItem = nullptr);
+
+public slots:
+    void updateSkeletonAnimation();
+    void loadResource();
+
+private:
+    SpineItem* m_spItem = nullptr;
 };
 
 #endif // SPINEITEM_H

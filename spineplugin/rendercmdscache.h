@@ -38,6 +38,8 @@
 #include <QOpenGLFunctions>
 #include <spine/spine.h>
 
+class SpineItem;
+
 QT_FORWARD_DECLARE_CLASS(QSGTexture)
 QT_FORWARD_DECLARE_CLASS(QOpenGLShaderProgram)
 
@@ -70,7 +72,7 @@ public:
 class RenderCmdsCache
 {
 public:
-    RenderCmdsCache();
+    RenderCmdsCache(SpineItem* spItem);
     ~RenderCmdsCache();
 
     enum ShaderType {
@@ -78,7 +80,7 @@ public:
         ShaderColor
     };
 
-    void clear();
+    void clearCache();
 
     void blendFunc(GLenum sfactor, GLenum dfactor);
     void bindShader(ShaderType);
@@ -95,6 +97,10 @@ public:
     void render();
     void setSkeletonRect(const QRectF& rect);
 
+    void initShaderProgram();
+
+    bool isValid();
+
 private:
     QList<ICachedGLFunctionCall*> mglFuncs;
     QRectF mRect;
@@ -102,6 +108,8 @@ private:
     QSGTexture* mTexture;
     QOpenGLShaderProgram* mTextureShaderProgram;
     QOpenGLShaderProgram* mColorShaderProgram;
+    bool m_shaderInited = false;
+    SpineItem* m_spItem = nullptr;
 };
 
 #endif // POLYGONBATCH_H
