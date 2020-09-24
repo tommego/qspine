@@ -19,11 +19,11 @@ currently support:
  - debug slots
  - shared image texture for same image file instance loading
  - clipping effect
+ - full stack multithread support
+ - window, linux, arm/arm64 cross compile handle
  
 
  todo:
  - deug vertices
  - VertexEffect
- - animation cache
- - multi threading simulation
  - audio trigger
