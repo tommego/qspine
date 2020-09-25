@@ -21,7 +21,7 @@ currently support:
  - clipping effect
  - full stack multithread support
  - window, linux, arm/arm64 cross compile project handle
- 
+ - support realtime customized blend color on rgba/gray channel
 
  todo:
  - deug vertices
