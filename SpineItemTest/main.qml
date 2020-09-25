@@ -17,22 +17,16 @@ Window {
 
     SpineItem{
         id: mySpine
-//        atlasFile: "file:///home/beetom/Desktop/e5+/blood_bar/Blood_bar_anination.atlas"
-//        skeletonFile: "file:///home/beetom/Desktop/e5+/blood_bar/Blood_bar_anination.json"
         atlasFile: "examples/raptor/export/raptor-pma.atlas"
         skeletonFile: "examples/raptor/export/raptor-pro.json"
 //        atlasFile: "examples/goblins/export/goblins-pma.atlas"
 //        skeletonFile: "examples/goblins/export/goblins-ess.json"
-//        atlasFile: "file:///home/beetom/Desktop/light/1.atlas"
-//        skeletonFile: "file:///home/beetom/Desktop/light/1.json"
-//        atlasFile: "file:///home/beetom/Desktop/e5+/top_bar/1.atlas"
-//        skeletonFile: "file:///home/beetom/Desktop/e5+/top_bar/1.json"
         anchors.centerIn: parent
         fps: fpsSlider.value
         skeletonScale: scaleSlider.value
         timeScale: timeScaleSlider.value
         defaultMix: defautMixSlider.value
-        blendColorChannel: 4
+        blendColorChannel: -1
         onResourceReady: {
             animationRep.model = animations
             skinRep.model = skins
@@ -326,6 +320,14 @@ Window {
         id: countSlider
         onValueChanged: {
             spReap.model = value
+        }
+    }
+
+    Button{
+        text: "clear tracks"
+        anchors.bottom: parent.bottom
+        onClicked: {
+            mySpine.clearTracks();
         }
     }
 
