@@ -57,6 +57,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(qreal scaleX READ scaleX WRITE setScaleX NOTIFY scaleXChanged)
     Q_PROPERTY(qreal scaleY READ scaleY WRITE setScaleY NOTIFY scaleYChanged)
     Q_PROPERTY(QObject* vertexEfect READ vertexEfect WRITE setVertexEfect NOTIFY vertexEfectChanged)
+    Q_PROPERTY(QColor blendColor READ blendColor WRITE setBlendColor NOTIFY blendColorChanged)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -84,7 +85,6 @@ public:
     void setSkeletonFile(const QUrl &skeletonPath);
 
     bool isSkeletonReady() const;
-
 
     QSize sourceSize() const;
     void setSourceSize(const QSize &sourceSize);
@@ -124,6 +124,9 @@ public:
     QObject *vertexEfect() const;
     void setVertexEfect(QObject *vertexEfect);
 
+    QColor blendColor() const;
+    void setBlendColor(const QColor &color);
+
 signals:
     void atlasFileChanged(const QUrl& path);
     void skeletonFileChanged(const QUrl& path);
@@ -150,6 +153,8 @@ signals:
     void animationDisposed();
     void cacheRendered();
     void animationUpdated();
+    void blendColorChanged(const QColor& color);
+    void resourceLoadFailed();
 
 private slots:
     void onAnythingReady();
@@ -194,12 +199,11 @@ private:
     SpineVertexEffect* m_vertexEfect = nullptr;
     QSharedPointer<QTimer> m_lazyLoadTimer;
     QElapsedTimer m_tickCounter;
-    spine::Vector<SpineVertex> m_currentVertices;
-    spine::Vector<GLushort> m_currentTriangles;
     QSharedPointer<RenderCmdsCache> m_renderCache;
     QList<RenderData> m_batches;
     QSharedPointer<SpineItemWorker> m_spWorker;
     QSharedPointer<QThread> m_spWorkerThread;
+    QColor m_blendColor;
 };
 
 class SpineItemWorker: public QObject{

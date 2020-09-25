@@ -16,7 +16,7 @@ SkeletonRenderer::~SkeletonRenderer()
 QOpenGLFramebufferObject *SkeletonRenderer::createFramebufferObject(const QSize &size)
 {
     QOpenGLFramebufferObjectFormat format;
-    format.setAttachment(QOpenGLFramebufferObject::CombinedDepthStencil);
+    format.setAttachment(QOpenGLFramebufferObject::Depth);
     return new QOpenGLFramebufferObject(size, format);
 }
 

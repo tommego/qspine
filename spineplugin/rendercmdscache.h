@@ -89,7 +89,7 @@ public:
     void pointSize(GLfloat pointSize);
 
     void drawTriangles(QSGTexture* texture, spine::Vector<SpineVertex> vertices,
-                       spine::Vector<GLushort> triangles);
+                       spine::Vector<GLushort> triangles, const QColor& blendColor);
     void drawPoly(const Point* points, int pointCount);
     void drawLine(const Point& origin, const Point& destination);
     void drawPoint(const Point& point);
@@ -106,8 +106,8 @@ private:
     QRectF mRect;
 
     QSGTexture* mTexture;
-    QOpenGLShaderProgram* mTextureShaderProgram;
-    QOpenGLShaderProgram* mColorShaderProgram;
+    QOpenGLShaderProgram* mTextureShaderProgram = nullptr;
+    QOpenGLShaderProgram* mColorShaderProgram = nullptr;
     bool m_shaderInited = false;
     SpineItem* m_spItem = nullptr;
 };

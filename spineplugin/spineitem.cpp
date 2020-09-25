@@ -70,6 +70,7 @@ SpineItem::SpineItem(QQuickItem *parent) :
     m_spWorker(new SpineItemWorker(nullptr, this)),
     m_spWorkerThread(new QThread)
 {
+    m_blendColor = QColor(255, 255, 255, 255);
     AimyTextureLoader::instance()->setWindow(window());
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(50);
@@ -84,8 +85,9 @@ SpineItem::SpineItem(QQuickItem *parent) :
 
 SpineItem::~SpineItem()
 {
-    m_spWorkerThread->terminate();
+    m_spWorkerThread->quit();
     m_spWorkerThread->wait();
+    m_spWorker.reset();
     releaseSkeletonRelatedData();
     delete [] m_worldVertices;
 }
@@ -238,12 +240,14 @@ void SpineItem::setSkeletonFile(const QUrl &skeletonPath)
 
 void SpineItem::loadResource()
 {
-    QMetaObject::invokeMethod(m_spWorker.get(), "loadResource");
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "loadResource");
 }
 
 void SpineItem::updateSkeletonAnimation()
 {
-    QMetaObject::invokeMethod(m_spWorker.get(), "updateSkeletonAnimation");
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "updateSkeletonAnimation");
 }
 
 QRectF SpineItem::computeBoundingRect()
@@ -352,6 +356,7 @@ void SpineItem::batchRenderCmd()
                           skeletonColor.g * slotColor.g,
                           skeletonColor.b * slotColor.b,
                           skeletonColor.a * slotColor.a);
+
         Texture* texture = nullptr;
         if(attachment->getRTTI().isExactly(spine::RegionAttachment::rtti)) {
             auto regionAttachment = (spine::RegionAttachment*)attachment;
@@ -433,7 +438,7 @@ void SpineItem::batchRenderCmd()
                     continue;
                 }
                 batch.triangles.setSize(m_clipper->getClippedTriangles().size(), 0);
-                memcpy(batch.triangles.buffer(), m_clipper->getClippedTriangles().buffer(), m_currentTriangles.size() * sizeof (unsigned short));
+                memcpy(batch.triangles.buffer(), m_clipper->getClippedTriangles().buffer(), batch.triangles.size() * sizeof (unsigned short));
                 auto newUvs = m_clipper->getClippedUVs();
                 auto newVertices = m_clipper->getClippedVertices();
                 batch.vertices.setSize(vertCount, SpineVertex());
@@ -454,7 +459,6 @@ void SpineItem::batchRenderCmd()
                 hasBlend = false;
                 continue;
             }
-
             if(hasBlend) {
                 switch (batch.blendMode) {
                 case spine::BlendMode_Additive: {
@@ -466,7 +470,7 @@ void SpineItem::batchRenderCmd()
                     break;
                 }
                 case spine::BlendMode_Screen: {
-                    m_renderCache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                    m_renderCache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
                     break;
                 }
                 default:{
@@ -476,9 +480,13 @@ void SpineItem::batchRenderCmd()
                 }
             }
             m_batches << batch;
-            m_renderCache->drawTriangles( AimyTextureLoader::instance()->getGLTexture(batch.texture, window()), batch.vertices, batch.triangles);
+            m_renderCache->drawTriangles(
+                        AimyTextureLoader::instance()->getGLTexture(batch.texture,window()),
+                        batch.vertices,
+                        batch.triangles,
+                        m_blendColor);
             hasBlend = true;
-            m_clipper->clipEnd();
+            m_clipper->clipEnd(*slot);
         }
     }
     m_clipper->clipEnd();
@@ -528,6 +536,18 @@ void SpineItem::batchRenderCmd()
             }
         }
     }
+}
+
+QColor SpineItem::blendColor() const
+{
+    return m_blendColor;
+}
+
+void SpineItem::setBlendColor(const QColor &color)
+{
+    m_blendColor = color;
+    qDebug() << "SpineItem::setBlendColor" << color;
+    emit blendColorChanged(color);
 }
 
 QObject *SpineItem::vertexEfect() const
@@ -692,7 +712,7 @@ void SpineItem::onCacheRendered()
 
 bool SpineItem::isSkeletonReady() const
 {
-    return m_loaded && m_atlas && m_skeleton && m_animationState;
+    return m_loaded && m_atlas && m_skeleton && m_animationState && m_spWorkerThread->isRunning();
 }
 
 SpineItemWorker::SpineItemWorker(QObject *parent, SpineItem *spItem) :
@@ -745,18 +765,18 @@ void SpineItemWorker::loadResource()
     m_spItem->m_scaleY = 1.0;
     emit m_spItem->scaleXChanged(m_spItem->m_scaleX);
     emit m_spItem->scaleYChanged(m_spItem->m_scaleY);
-    emit m_spItem->animationsChanged(m_spItem->m_animations);
-    emit m_spItem->skinsChanged(m_spItem->m_skins);
     emit m_spItem->loadedChanged(m_spItem->m_loaded);
     emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());
 
     if(m_spItem->m_atlasFile.isEmpty() || !m_spItem->m_atlasFile.isValid()) {
         qWarning() << m_spItem->m_atlasFile << " not exists...";
+        emit m_spItem->resourceLoadFailed();
         return;
     }
 
     if(m_spItem->m_skeletonFile.isEmpty() || !m_spItem->m_skeletonFile.isValid()) {
         qWarning() << m_spItem->m_skeletonFile << " not exists...";
+        emit m_spItem->resourceLoadFailed();
         return;
     }
 
@@ -765,6 +785,7 @@ void SpineItemWorker::loadResource()
 
     if(m_spItem->m_atlas->getPages().size() == 0) {
         qWarning() << "Failed to load atlas...";
+        emit m_spItem->resourceLoadFailed();
         return;
     }
 
@@ -773,6 +794,7 @@ void SpineItemWorker::loadResource()
     m_spItem->m_skeletonData.reset(json.readSkeletonDataFile(urltospinestring(m_spItem->m_skeletonFile)));
     if(m_spItem->m_skeletonData.isNull()) {
         qWarning() << json.getError().buffer();
+        emit m_spItem->resourceLoadFailed();
         return;
     }
 
@@ -802,12 +824,12 @@ void SpineItemWorker::loadResource()
     }
 //        if(m_skins.contains("default"))
 //            m_skeleton->setSkin(m_skins.last().toStdString().c_str());
-    emit m_spItem->skinsChanged(m_spItem->m_skins);
 
     m_spItem->m_skeleton->setScaleX(m_spItem->m_skeletonScale * m_spItem->m_scaleX);
     m_spItem->m_skeleton->setScaleY(m_spItem->m_skeletonScale * m_spItem->m_scaleY);
 
     m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
+    emit m_spItem->skinsChanged(m_spItem->m_skins);
     emit m_spItem->loadedChanged(m_spItem->m_loaded);
     emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());
     emit m_spItem->resourceReady();

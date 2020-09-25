@@ -42,15 +42,15 @@ unix {
 ARCH = win32
 
 linux-aarch64-gnu-g++:{
-    ARCH = linux_aarch64
+    ARCH = aarch64
 }
 
 linux-arm-gnueabi-g++:{
-    ARCH = linux_armhf
+    ARCH = arm
 }
 
 linux-g++:{
-    ARCH = linux_x86_64
+    ARCH = linux
 }
 
 DESTDIR = $$PWD/../bin/$$ARCH/Beelab/SpineItem

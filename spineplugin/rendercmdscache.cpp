@@ -33,6 +33,7 @@
 #include <QOpenGLContext>
 #include <QSGTexture>
 #include <QOpenGLShaderProgram>
+#include <QColor>
 
 #include "spineitem.h"
 
@@ -147,9 +148,10 @@ private:
 class DrawTrigngles: public ICachedGLFunctionCall
 {
 public:
-    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, spine::Vector<GLushort> triangles)
+    explicit DrawTrigngles(QOpenGLShaderProgram* program, QSGTexture* texture, spine::Vector<SpineVertex> vertices, spine::Vector<GLushort> triangles, QColor blendColor)
         :mShaderProgram(program)
         ,mTexture(texture)
+        ,m_blendColor(blendColor)
     {
         auto numvertices = vertices.size();
         if (triangles.size() <= 0 || numvertices <= 0 || !triangles.buffer())
@@ -176,7 +178,7 @@ public:
         mShaderProgram->setAttributeArray("a_position", GL_FLOAT, &m_vertices[0].x, 2, sizeof(SpineVertex));
         mShaderProgram->setAttributeArray("a_color", GL_FLOAT, &m_vertices[0].color.r, 4, sizeof(SpineVertex));
         mShaderProgram->setAttributeArray("a_texCoord", GL_FLOAT, &m_vertices[0].u, 2, sizeof(SpineVertex));
-
+        mShaderProgram->setUniformValue("u_blendColor", m_blendColor.redF(), m_blendColor.greenF(), m_blendColor.blueF(), m_blendColor.alphaF());
         glFuncs()->glDrawElements(GL_TRIANGLES, m_triangles.size(), GL_UNSIGNED_SHORT, m_triangles.buffer());
     }
 
@@ -185,6 +187,7 @@ private:
     spine::Vector<SpineVertex> m_vertices;
     spine::Vector<GLushort> m_triangles;
     QSGTexture* mTexture;
+    QColor m_blendColor = QColor(255, 255, 255, 255);
 };
 
 class DrawPolygon: public ICachedGLFunctionCall
@@ -270,8 +273,10 @@ RenderCmdsCache::RenderCmdsCache(SpineItem* spItem)
 RenderCmdsCache::~RenderCmdsCache()
 {
     clearCache();
-    delete mTextureShaderProgram;
-    delete mColorShaderProgram;
+    if(mTextureShaderProgram)
+        delete mTextureShaderProgram;
+    if(mColorShaderProgram)
+        delete mColorShaderProgram;
 }
 
 void RenderCmdsCache::clearCache()
@@ -286,9 +291,9 @@ void RenderCmdsCache::clearCache()
 }
 
 void RenderCmdsCache::drawTriangles(QSGTexture* addTexture, spine::Vector<SpineVertex> vertices,
-                                    spine::Vector<GLushort> triangles)
+                                    spine::Vector<GLushort> triangles, const QColor& blendColor)
 {
-    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, triangles));
+    mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture, vertices, triangles, blendColor));
 }
 
 void RenderCmdsCache::blendFunc(GLenum sfactor, GLenum dfactor)
