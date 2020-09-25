@@ -17,11 +17,11 @@ currently support:
  - async loading
  - debug bones
  - debug slots
- - shared image texture for same image file instance loading
+ - shared image texture
  - clipping effect
  - full stack multithread support
- - window, linux, arm/arm64 cross compile handle
- 
+ - window, linux, arm/arm64 cross compile project handle
+ - support realtime customized blend color on rgba/gray channel
 
  todo:
  - deug vertices
