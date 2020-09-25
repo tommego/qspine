@@ -58,6 +58,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(qreal scaleY READ scaleY WRITE setScaleY NOTIFY scaleYChanged)
     Q_PROPERTY(QObject* vertexEfect READ vertexEfect WRITE setVertexEfect NOTIFY vertexEfectChanged)
     Q_PROPERTY(QColor blendColor READ blendColor WRITE setBlendColor NOTIFY blendColorChanged)
+    Q_PROPERTY(int blendColorChannel READ blendColorChannel WRITE setBlendColorChannel NOTIFY blendColorChannelChanged) // -1=none, 0=r, 1=g, 2=b, 3=a, 4=gray
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -127,6 +128,12 @@ public:
     QColor blendColor() const;
     void setBlendColor(const QColor &color);
 
+    int blendChannel() const;
+    void setBlendChannel(int blendChannel);
+
+    int blendColorChannel() const;
+    void setBlendColorChannel(int blendColorChannel);
+
 signals:
     void atlasFileChanged(const QUrl& path);
     void skeletonFileChanged(const QUrl& path);
@@ -155,6 +162,10 @@ signals:
     void animationUpdated();
     void blendColorChanged(const QColor& color);
     void resourceLoadFailed();
+    void blendColorChannelChanged(const int& channel);
+
+protected:
+    virtual void componentComplete() override;
 
 private slots:
     void onAnythingReady();
@@ -204,6 +215,9 @@ private:
     QSharedPointer<SpineItemWorker> m_spWorker;
     QSharedPointer<QThread> m_spWorkerThread;
     QColor m_blendColor;
+    bool m_componentCompleted = false;
+    int m_blendColorChannel = -1;
+    bool m_requestDestroy = false;
 };
 
 class SpineItemWorker: public QObject{

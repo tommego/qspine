@@ -54,8 +54,7 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
         emit spItem->animationDisposed();
         break;
     }
-    default:{
-        qWarning() << "unknown event type " << type;
+    case spine::EventType_Event: {
         break;
     }
     }
@@ -66,25 +65,29 @@ SpineItem::SpineItem(QQuickItem *parent) :
     m_skeletonScale(1.0),
     m_clipper(new spine::SkeletonClipping),
     m_lazyLoadTimer(new QTimer),
-    m_renderCache(new RenderCmdsCache(this)),
+    m_renderCache(new RenderCmdsCache(this, this)),
     m_spWorker(new SpineItemWorker(nullptr, this)),
     m_spWorkerThread(new QThread)
 {
     m_blendColor = QColor(255, 255, 255, 255);
-    AimyTextureLoader::instance()->setWindow(window());
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(50);
     m_worldVertices = new float[2000];
     connect(this, &SpineItem::resourceReady, this, &SpineItem::onAnythingReady);
     connect(m_lazyLoadTimer.get(), &QTimer::timeout, [=]{releaseSkeletonRelatedData();loadResource();});
     connect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
-    connect(this, &SpineItem::cacheRendered, this, &SpineItem::onCacheRendered);
+    connect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
     m_spWorker->moveToThread(m_spWorkerThread.get());
     m_spWorkerThread->start();
 }
 
 SpineItem::~SpineItem()
 {
+    disconnect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
+
+    if(m_animationState)
+        m_animationState->clearTracks();
+    m_requestDestroy = true;
     m_spWorkerThread->quit();
     m_spWorkerThread->wait();
     m_spWorker.reset();
@@ -322,7 +325,7 @@ bool SpineItem::nothingToDraw(spine::Slot &slot)
 
 void SpineItem::batchRenderCmd()
 {
-    if(!m_renderCache || !m_renderCache->isValid())
+    if(!m_renderCache || !m_renderCache->isValid() || !m_componentCompleted)
         return;
 
     // batching
@@ -484,7 +487,8 @@ void SpineItem::batchRenderCmd()
                         AimyTextureLoader::instance()->getGLTexture(batch.texture,window()),
                         batch.vertices,
                         batch.triangles,
-                        m_blendColor);
+                        m_blendColor,
+                        m_blendColorChannel);
             hasBlend = true;
             m_clipper->clipEnd(*slot);
         }
@@ -538,6 +542,17 @@ void SpineItem::batchRenderCmd()
     }
 }
 
+int SpineItem::blendColorChannel() const
+{
+    return m_blendColorChannel;
+}
+
+void SpineItem::setBlendColorChannel(int blendColorChannel)
+{
+    m_blendColorChannel = blendColorChannel;
+    emit blendColorChannelChanged(m_blendColorChannel);
+}
+
 QColor SpineItem::blendColor() const
 {
     return m_blendColor;
@@ -546,8 +561,13 @@ QColor SpineItem::blendColor() const
 void SpineItem::setBlendColor(const QColor &color)
 {
     m_blendColor = color;
-    qDebug() << "SpineItem::setBlendColor" << color;
     emit blendColorChanged(color);
+}
+
+void SpineItem::componentComplete()
+{
+    QQuickFramebufferObject::componentComplete();
+    m_componentCompleted = true;
 }
 
 QObject *SpineItem::vertexEfect() const
@@ -707,6 +727,8 @@ void SpineItem::updateBoundingRect()
 
 void SpineItem::onCacheRendered()
 {
+    if(m_requestDestroy)
+        return;
     updateSkeletonAnimation();
 }
 
@@ -755,6 +777,7 @@ void SpineItemWorker::updateSkeletonAnimation()
 
 void SpineItemWorker::loadResource()
 {
+    while(!m_spItem->m_componentCompleted) {QThread::msleep(100);}
     AimyTextureLoader::instance()->setWindow(m_spItem->window());
     m_spItem->m_isLoading = true;
 

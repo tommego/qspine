@@ -34,6 +34,7 @@
 #include <QtGlobal>
 #include <QColor>
 #include <QList>
+#include <QObject>
 #include <QRectF>
 #include <QOpenGLFunctions>
 #include <spine/spine.h>
@@ -69,10 +70,11 @@ public:
     QOpenGLFunctions* glFuncs();
 };
 
-class RenderCmdsCache
+class RenderCmdsCache: public QObject
 {
+    Q_OBJECT
 public:
-    RenderCmdsCache(SpineItem* spItem);
+    explicit RenderCmdsCache(QObject* parent = nullptr, SpineItem* spItem = nullptr);
     ~RenderCmdsCache();
 
     enum ShaderType {
@@ -89,7 +91,7 @@ public:
     void pointSize(GLfloat pointSize);
 
     void drawTriangles(QSGTexture* texture, spine::Vector<SpineVertex> vertices,
-                       spine::Vector<GLushort> triangles, const QColor& blendColor);
+                       spine::Vector<GLushort> triangles, const QColor& blendColor, const int &blendColorChannel);
     void drawPoly(const Point* points, int pointCount);
     void drawLine(const Point& origin, const Point& destination);
     void drawPoint(const Point& point);
@@ -100,6 +102,9 @@ public:
     void initShaderProgram();
 
     bool isValid();
+
+signals:
+    void cacheRendered();
 
 private:
     QList<ICachedGLFunctionCall*> mglFuncs;
