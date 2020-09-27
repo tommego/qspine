@@ -73,7 +73,7 @@ SpineItem::SpineItem(QQuickItem *parent) :
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(50);
     m_worldVertices = new float[2000];
-    connect(this, &SpineItem::resourceReady, this, &SpineItem::onAnythingReady);
+//    connect(this, &SpineItem::resourceReady, this, &SpineItem::onAnythingReady);
     connect(m_lazyLoadTimer.get(), &QTimer::timeout, [=]{releaseSkeletonRelatedData();loadResource();});
     connect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
     connect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
@@ -258,6 +258,7 @@ QRectF SpineItem::computeBoundingRect()
     if(!isSkeletonReady())
         return QRectF();
     float minX = FLT_MAX, minY = FLT_MAX, maxX = FLT_MIN, maxY = FLT_MIN;
+    float vminX = FLT_MAX, vminY = FLT_MAX, vmaxX = FLT_MIN, vmaxY = FLT_MIN;
     for(int i = 0; i < m_skeleton->getSlots().size(); i++) {
         auto slot = m_skeleton->getSlots()[i];
         if(!slot->getAttachment())
@@ -268,10 +269,33 @@ QRectF SpineItem::computeBoundingRect()
             auto* regionAttachment = static_cast<spine::RegionAttachment*>(slot->getAttachment());
             regionAttachment->computeWorldVertices(slot->getBone(), m_worldVertices, 0, 2);
             verticesCount = 8;
+            // handle viewport mode
+            if(QString(attachment->getName().buffer()).endsWith("viewport")) {
+                m_hasViewPort = true;
+                for (int ii = 0; ii < verticesCount; ii+=2) {
+                    float x = m_worldVertices[ii], y = m_worldVertices[ii + 1];
+                    vminX = qMin(vminX, x);
+                    vminY = qMin(vminY, y);
+                    vmaxX = qMax(vmaxX, x);
+                    vmaxY = qMax(vmaxY, y);
+                }
+                m_viewPortRect = QRectF(vminX, vminY, vmaxX - vminX, vmaxY - vminY);
+            }
         } else if(attachment->getRTTI().isExactly(spine::MeshAttachment::rtti)) {
             auto* meshAttachment = static_cast<spine::MeshAttachment*>(slot->getAttachment());
             verticesCount = meshAttachment->getWorldVerticesLength();
             meshAttachment->computeWorldVertices(*slot, m_worldVertices);
+            if(QString(attachment->getName().buffer()).endsWith("viewport")) {
+                m_hasViewPort = true;
+                for (int ii = 0; ii < verticesCount; ii+=2) {
+                    float x = m_worldVertices[ii], y = m_worldVertices[ii + 1];
+                    vminX = qMin(vminX, x);
+                    vminY = qMin(vminY, y);
+                    vmaxX = qMax(vmaxX, x);
+                    vmaxY = qMax(vmaxY, y);
+                }
+                m_viewPortRect = QRectF(vminX, vminY, vmaxX - vminX, vmaxY - vminY);
+            }
         } else
             continue;
         for (int ii = 0; ii < verticesCount; ii+=2) {
@@ -296,6 +320,7 @@ Texture *SpineItem::getTexture(spine::Attachment *attachment) const
 }
 
 void SpineItem::releaseSkeletonRelatedData(){
+    m_hasViewPort = false;
     m_animationStateData.reset();
     m_animationState.reset();
     m_skeletonData.reset();
@@ -329,8 +354,10 @@ void SpineItem::batchRenderCmd()
         return;
 
     // batching
-    m_renderCache->clearCache();
-    m_renderCache->setSkeletonRect(m_boundingRect);
+    if(m_hasViewPort)
+        m_renderCache->setSkeletonRect(m_viewPortRect);
+    else
+        m_renderCache->setSkeletonRect(m_boundingRect);
     m_batches.clear();
 
     m_renderCache->bindShader(RenderCmdsCache::ShaderTexture);
@@ -720,8 +747,11 @@ void SpineItem::onAnythingReady()
 
 void SpineItem::updateBoundingRect()
 {
-    setImplicitSize(m_boundingRect.width(), m_boundingRect.height());
     setSourceSize(QSize(m_boundingRect.width(), m_boundingRect.height()));
+    if(m_hasViewPort)
+        setImplicitSize(m_viewPortRect.width(), m_viewPortRect.height());
+    else
+        setImplicitSize(m_boundingRect.width(), m_boundingRect.height());
     update();
 }
 
@@ -777,6 +807,9 @@ void SpineItemWorker::updateSkeletonAnimation()
 
 void SpineItemWorker::loadResource()
 {
+//    if(m_spItem->isSkeletonReady())
+//        m_spItem->clearTracks();
+    m_spItem->releaseSkeletonRelatedData();
     while(!m_spItem->m_componentCompleted) {QThread::msleep(100);}
     AimyTextureLoader::instance()->setWindow(m_spItem->window());
     m_spItem->m_isLoading = true;
@@ -851,7 +884,7 @@ void SpineItemWorker::loadResource()
     m_spItem->m_skeleton->setScaleX(m_spItem->m_skeletonScale * m_spItem->m_scaleX);
     m_spItem->m_skeleton->setScaleY(m_spItem->m_skeletonScale * m_spItem->m_scaleY);
 
-    m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
+    updateSkeletonAnimation();
     emit m_spItem->skinsChanged(m_spItem->m_skins);
     emit m_spItem->loadedChanged(m_spItem->m_loaded);
     emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());

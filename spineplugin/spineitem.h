@@ -188,6 +188,7 @@ private:
     bool m_debugBones = false;
     bool m_debugSlots = false;
     bool m_isLoading = false;
+    bool m_hasViewPort = false;
     qreal m_scaleX = 1.0;
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
@@ -200,6 +201,7 @@ private:
     QStringList m_animations;
     QStringList m_skins;
     QRectF m_boundingRect;
+    QRectF m_viewPortRect;
     QElapsedTimer m_timer;
     QSharedPointer<spine::Atlas> m_atlas;
     QSharedPointer<spine::SkeletonData> m_skeletonData;

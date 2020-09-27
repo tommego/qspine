@@ -363,6 +363,7 @@ void RenderCmdsCache::render()
     }
     foreach (ICachedGLFunctionCall* func, mglFuncs)
         func->invoke();
+    clearCache();
     emit cacheRendered();
 }
 
