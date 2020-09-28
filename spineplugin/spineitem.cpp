@@ -35,23 +35,23 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     QString animationName = QString(entry->getAnimation()->getName().buffer());
     switch (type) {
     case spine::EventType_Start:{
-        emit spItem->animationStarted();
+        emit spItem->animationStarted(entry->getTrackIndex());
         break;
     }
     case spine::EventType_Interrupt: {
-        emit spItem->animationInterrupted();
+        emit spItem->animationInterrupted(entry->getTrackIndex());
         break;
     }
     case spine::EventType_End: {
-        emit spItem->animationEnded();
+        emit spItem->animationEnded(entry->getTrackIndex());
         break;
     }
     case spine::EventType_Complete: {
-        emit spItem->animationCompleted();
+        emit spItem->animationCompleted(entry->getTrackIndex());
         break;
     }
     case spine::EventType_Dispose: {
-        emit spItem->animationDisposed();
+        emit spItem->animationDisposed(entry->getTrackIndex());
         break;
     }
     case spine::EventType_Event: {
@@ -208,11 +208,12 @@ void SpineItem::clearTrack(int trackIndex)
     m_animationState->clearTrack(size_t(trackIndex));
 }
 
-static unsigned short quadIndices[] = {0, 1, 2, 2, 3, 0};
-
-void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
+void SpineItem::stopAll()
 {
-    Q_UNUSED(renderer)
+    clearTracks();
+    setSlotsToSetupPose();
+    setBonesToSetupPose();
+    setToSetupPose();
 }
 
 QUrl SpineItem::atlasFile() const
@@ -347,6 +348,8 @@ bool SpineItem::nothingToDraw(spine::Slot &slot)
     }
     return false;
 }
+
+static unsigned short quadIndices[] = {0, 1, 2, 2, 3, 0};
 
 void SpineItem::batchRenderCmd()
 {
@@ -567,6 +570,11 @@ void SpineItem::batchRenderCmd()
             }
         }
     }
+}
+
+void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
+{
+    Q_UNUSED(renderer)
 }
 
 int SpineItem::blendColorChannel() const
@@ -861,7 +869,7 @@ void SpineItemWorker::loadResource()
     m_spItem->m_animationStateData->setDefaultMix(m_spItem->m_defaultMix);
 
     m_spItem->m_animationState.reset(new spine::AnimationState(m_spItem->m_animationStateData.get()));
-    m_spItem->m_animationState->setRendererObject(this);
+    m_spItem->m_animationState->setRendererObject(m_spItem);
     m_spItem->m_animationState->setListener(animationSateListioner);
     m_spItem->m_loaded = true;
     m_spItem->m_isLoading = false;

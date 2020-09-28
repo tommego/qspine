@@ -64,20 +64,70 @@ public:
     explicit SpineItem(QQuickItem *parent = nullptr);
     ~SpineItem() override;
     virtual Renderer *createRenderer() const override;
+
+    /**
+     * @brief setToSetupPose Affect after clearTracks() has been invoked.
+     */
     Q_INVOKABLE void setToSetupPose();
+    /**
+     * @brief setBonesToSetupPose Affect after clearTracks() has been invoked.
+     */
     Q_INVOKABLE void setBonesToSetupPose();
+    /**
+     * @brief setSlotsToSetupPose Affect after clearTracks() has been invoked.
+     */
     Q_INVOKABLE void setSlotsToSetupPose();
+    /**
+     * @brief setAttachment Dynaimicly change attachment for a slot.
+     * @param slotName
+     * @param attachmentName
+     * @return
+     */
     Q_INVOKABLE bool setAttachment(const QString& slotName, const QString& attachmentName);
+    /**
+     * @brief setMix Animation mixing duration.
+     * @param fromAnimation
+     * @param toAnimation
+     * @param duration
+     */
     Q_INVOKABLE void setMix(const QString& fromAnimation, const QString& toAnimation, float duration);
+    /**
+     * @brief setAnimation Sets the current animation for a track, discarding any queued animations.
+     * A track entry to allow further customization of animation playback. References to the track entry must not be kept after AnimationState.Dispose.
+     * @param trackIndex
+     * @param name
+     * @param loop If true, the animation will repeat.If false, it will not, instead its last frame is applied if played beyond its duration. In either case TrackEntry.TrackEnd determines when the track is cleared.
+     */
     Q_INVOKABLE void setAnimation (int trackIndex, const QString& name, bool loop);
+    /**
+     * @brief addAnimation Queues an animation by name.
+     * @param trackIndex
+     * @param name
+     * @param loop
+     * @param delay
+     */
     Q_INVOKABLE void addAnimation (int trackIndex, const QString& name, bool loop, float delay = 0);
+    /**
+     * @brief setSkin Changes skin by specified skin name at anytime.
+     * @param skinName
+     */
     Q_INVOKABLE void setSkin(const QString& skinName);
+    /**
+     * @brief clearTracks Clears all animation tracks, and keeps last rendered frame pixels, and after then you can invoke setToSetupPose to rollback firstly orignal frame immediately.
+     */
     Q_INVOKABLE void clearTracks ();
+    /**
+     * @brief clearTrack Clear specfied animation track by given track id.
+     * @param trackIndex
+     */
     Q_INVOKABLE void clearTrack(int trackIndex = 0);
+    /**
+     * @brief stopAll Affect any time. Clears all animation tracks and rollback to firstly orignal frame.
+     */
+    Q_INVOKABLE void stopAll();
 
     friend class SpineItemWorker;
-
-    void renderToCache(QQuickFramebufferObject::Renderer* renderer);
+    friend class SkeletonRenderer;
 
     QUrl atlasFile() const;
     void setAtlasFile(const QUrl &atlasPath);
@@ -153,11 +203,11 @@ signals:
     void scaleXChanged(const qreal& scaleX);
     void scaleYChanged(const qreal& scaleY);
     void vertexEfectChanged();
-    void animationStarted();
-    void animationCompleted();
-    void animationInterrupted();
-    void animationEnded();
-    void animationDisposed();
+    void animationStarted(int trackId);
+    void animationCompleted(int trackId);
+    void animationInterrupted(int trackId);
+    void animationEnded(int trackId);
+    void animationDisposed(int trackId);
     void cacheRendered();
     void animationUpdated();
     void blendColorChanged(const QColor& color);
@@ -180,6 +230,7 @@ private:
     void releaseSkeletonRelatedData();
     bool nothingToDraw(spine::Slot& slot);
     void batchRenderCmd();
+    void renderToCache(QQuickFramebufferObject::Renderer* renderer);
 
 private:
     QUrl m_atlasFile;
