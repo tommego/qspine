@@ -15,22 +15,42 @@ Window {
         mySpine.blendColor = Qt.rgba(rSlider.value / 255.0, gSlider.value / 255.0, bSlider.value / 255.0, aSlider.value / 255.0);
     }
 
+    Rectangle{
+        border.width: 1
+        border.color: "red"
+        anchors.fill: mySpine
+        color: "#33000000"
+    }
+
+    DropArea{
+        anchors.fill: parent
+        onDropped: {
+            if(drop.hasUrls) {
+                var url = drop.urls[0]
+                var items = url.split("/")
+                var fileName = items[items.length -1]
+                var atlasFile = url + "/" + fileName + ".atlas"
+                var skeletonFile = url + "/" + fileName + ".json"
+                mySpine.atlasFile = atlasFile
+                mySpine.skeletonFile = skeletonFile
+                console.log(atlasFile, skeletonFile)
+            }
+        }
+    }
+
     SpineItem{
         id: mySpine
         atlasFile: "examples/raptor/export/raptor-pma.atlas"
         skeletonFile: "examples/raptor/export/raptor-pro.json"
-//        atlasFile: "examples/goblins/export/goblins-pma.atlas"
-//        skeletonFile: "examples/goblins/export/goblins-ess.json"
-        anchors.centerIn: parent
         fps: fpsSlider.value
         skeletonScale: scaleSlider.value
         timeScale: timeScaleSlider.value
         defaultMix: defautMixSlider.value
         blendColorChannel: -1
+        anchors.centerIn: parent
         onResourceReady: {
             animationRep.model = animations
             skinRep.model = skins
-            setAnimation(0, "flip", true)
         }
     }
 
@@ -265,30 +285,31 @@ Window {
     }
 
 
-    FPSText {
-        id: fpsText
-        width: 100
-        height: 30
-        Text {
-            anchors.centerIn: parent
-            font.pixelSize: 16
-            text: fpsText.fps
-        }
-    }
+//    FPSText {
+//        id: fpsText
+//        width: 100
+//        height: 30
+//        Text {
+//            anchors.centerIn: parent
+//            font.pixelSize: 16
+//            text: fpsText.fps
+//        }
+//    }
+
+    // animation sequence example.
     Repeater{
         id: spReap
-        model: 13
+        model: countSlider.value
         SpineItem{
             atlasFile: "examples/alien/export/alien-pma.atlas"
             skeletonFile: "examples/alien/export/alien-ess.json"
             fps: fpsSlider.value
             skeletonScale: 0.2
             x: Math.floor(index / 20) * 60
-            y: index % 20 * 60
+            y: index % 20 * 60 + 100
             timeScale: timeScaleSlider.value
             defaultMix: 0.1
             onResourceReady: {
-//                setAnimation(0, "death", true);
                 addAnimation(0, "jump", false, 0)
                 addAnimation(0, "run", false, 0)
                 addAnimation(0, "hit", false, 0)
@@ -316,7 +337,8 @@ Window {
         anchors.bottom: parent.bottom
         minimumValue: 0
         maximumValue: 100
-        width: 600
+        value: 0
+        width: 300
         id: countSlider
         onValueChanged: {
             spReap.model = value
@@ -324,10 +346,11 @@ Window {
     }
 
     Button{
-        text: "clear tracks"
+        text: "Set to origin"
         anchors.bottom: parent.bottom
         onClicked: {
             mySpine.clearTracks();
+            mySpine.setToSetupPose();
         }
     }
 

@@ -121,10 +121,6 @@ public:
      * @param trackIndex
      */
     Q_INVOKABLE void clearTrack(int trackIndex = 0);
-    /**
-     * @brief stopAll Affect any time. Clears all animation tracks and rollback to firstly orignal frame.
-     */
-    Q_INVOKABLE void stopAll();
 
     friend class SpineItemWorker;
     friend class SkeletonRenderer;
@@ -185,6 +181,8 @@ public:
     void setBlendColorChannel(int blendColorChannel);
 
 signals:
+
+    // property signals
     void atlasFileChanged(const QUrl& path);
     void skeletonFileChanged(const QUrl& path);
     void isSkeletonReadyChanged(const bool& ready);
@@ -193,7 +191,6 @@ signals:
     void premultipliedAlphaChanged(const bool& ret);
     void debugBonesChanged(const bool& ret);
     void debugSlotsChanged(const bool& ret);
-    void resourceReady();
     void animationsChanged(const QStringList& animations);
     void skinsChanged(const QStringList& skins);
     void skeletonScaleChanged(const qreal& scale);
@@ -203,24 +200,27 @@ signals:
     void scaleXChanged(const qreal& scaleX);
     void scaleYChanged(const qreal& scaleY);
     void vertexEfectChanged();
+    void animationUpdated();
+    void blendColorChanged(const QColor& color);
+    void resourceLoadFailed();
+    void blendColorChannelChanged(const int& channel);
+
+    // rumtime signals
     void animationStarted(int trackId);
     void animationCompleted(int trackId);
     void animationInterrupted(int trackId);
     void animationEnded(int trackId);
     void animationDisposed(int trackId);
     void cacheRendered();
-    void animationUpdated();
-    void blendColorChanged(const QColor& color);
-    void resourceLoadFailed();
-    void blendColorChannelChanged(const int& channel);
+    void resourceReady();
 
 protected:
     virtual void componentComplete() override;
 
 private slots:
-    void onAnythingReady();
     void updateBoundingRect();
     void onCacheRendered();
+    void onVisibleChanged();
 
 private:
     void loadResource();
@@ -243,7 +243,7 @@ private:
     qreal m_scaleX = 1.0;
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
-    int m_fps = 60;
+    int m_fps = 25;
     qreal m_defaultMix = 0.1;
     QSize m_sourceSize;
     float* m_worldVertices;

@@ -408,4 +408,3 @@ bool RenderCmdsCache::isValid()
 {
     return m_shaderInited;
 }
-
