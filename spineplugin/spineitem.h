@@ -48,6 +48,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(bool loaded READ loaded NOTIFY loadedChanged)
     Q_PROPERTY(bool debugBones READ debugBones WRITE setDebugBones NOTIFY debugBonesChanged)
     Q_PROPERTY(bool debugSlots READ debugSlots WRITE setDebugSlots NOTIFY debugSlotsChanged)
+    Q_PROPERTY(bool debugMesh READ debugMesh WRITE setDebugMesh NOTIFY debugMeshChanged)
     Q_PROPERTY(QStringList animations READ animations NOTIFY animationsChanged)
     Q_PROPERTY(QStringList skins READ skins  NOTIFY skinsChanged)
     Q_PROPERTY(qreal skeletonScale READ skeletonScale WRITE setSkeletonScale NOTIFY skeletonScaleChanged)
@@ -180,6 +181,9 @@ public:
     int blendColorChannel() const;
     void setBlendColorChannel(int blendColorChannel);
 
+    bool debugMesh() const;
+    void setDebugMesh(bool debugMesh);
+
 signals:
 
     // property signals
@@ -191,6 +195,7 @@ signals:
     void premultipliedAlphaChanged(const bool& ret);
     void debugBonesChanged(const bool& ret);
     void debugSlotsChanged(const bool& ret);
+    void debugMeshChanged(const bool& ret);
     void animationsChanged(const QStringList& animations);
     void skinsChanged(const QStringList& skins);
     void skeletonScaleChanged(const qreal& scale);
@@ -238,6 +243,7 @@ private:
     bool m_loaded = false;
     bool m_debugBones = false;
     bool m_debugSlots = false;
+    bool m_debugMesh = false;
     bool m_isLoading = false;
     bool m_hasViewPort = false;
     qreal m_scaleX = 1.0;

@@ -255,8 +255,8 @@ QRectF SpineItem::computeBoundingRect()
 {
     if(!isSkeletonReady())
         return QRectF();
-    float minX = FLT_MAX, minY = FLT_MAX, maxX = FLT_MIN, maxY = FLT_MIN;
-    float vminX = FLT_MAX, vminY = FLT_MAX, vmaxX = FLT_MIN, vmaxY = FLT_MIN;
+    float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+    float vminX = FLT_MAX, vminY = FLT_MAX, vmaxX = -FLT_MAX, vmaxY = -FLT_MAX;
     for(int i = 0; i < m_skeleton->getSlots().size(); i++) {
         auto slot = m_skeleton->getSlots()[i];
         if(!slot->getAttachment())
@@ -523,7 +523,7 @@ void SpineItem::batchRenderCmd()
     m_clipper->clipEnd();
 
     // debug drawing
-    if(m_debugBones || m_debugSlots) {
+    if(m_debugBones || m_debugSlots || m_debugMesh) {
         m_renderCache->bindShader(RenderCmdsCache::ShaderColor);
         m_renderCache->blendFunc(GL_ONE, GL_ZERO);
 
@@ -542,6 +542,26 @@ void SpineItem::batchRenderCmd()
                 points[2] = Point(m_worldVertices[4], m_worldVertices[5]);
                 points[3] = Point(m_worldVertices[6], m_worldVertices[7]);
                 m_renderCache->drawPoly(points, 4);
+            }
+        }
+
+        if(m_debugMesh) {
+            spine::Vector<Point> points;
+            m_renderCache->drawColor(40, 150, 200, 255);
+            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+                auto slot = m_skeleton->getSlots()[i];
+                if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::MeshAttachment::rtti))
+                    continue;
+                auto* mesh = (spine::MeshAttachment*)slot->getAttachment();
+                size_t numVertices = mesh->getWorldVerticesLength() / 2;
+                points.setSize(numVertices, Point());
+                mesh->computeWorldVertices(*slot,
+                                           0,
+                                           mesh->getWorldVerticesLength(),
+                                           (float*)points.buffer(),
+                                           0,
+                                           sizeof (Point) / sizeof (float));
+                m_renderCache->drawPoly(points.buffer(), points.size());
             }
         }
 
@@ -572,6 +592,17 @@ void SpineItem::batchRenderCmd()
 void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
 {
     Q_UNUSED(renderer)
+}
+
+bool SpineItem::debugMesh() const
+{
+    return m_debugMesh;
+}
+
+void SpineItem::setDebugMesh(bool debugMesh)
+{
+    m_debugMesh = debugMesh;
+    emit debugMeshChanged(m_debugMesh);
 }
 
 int SpineItem::blendColorChannel() const
