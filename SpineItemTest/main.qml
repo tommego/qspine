@@ -147,6 +147,11 @@ Window {
                     text: "debugSlots"
                     onCheckedChanged: mySpine.debugSlots = checked
                 }
+
+                CheckBox{
+                    text: "debugMesh"
+                    onCheckedChanged: mySpine.debugMesh = checked
+                }
             }
 
         }
