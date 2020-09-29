@@ -20,6 +20,22 @@ DEFINES += QT_DEPRECATED_WARNINGS
     PRE_TARGETDEPS += $$copy_qmldir.target
 }
 
+ARCH = win32
+
+linux-aarch64-gnu-g++:{
+    ARCH = aarch64
+}
+
+linux-arm-gnueabi-g++:{
+    ARCH = arm
+}
+
+linux-g++:{
+    ARCH = linux
+}
+
+DESTDIR = $$PWD/../bin/$$ARCH
+
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \

@@ -2,7 +2,6 @@ import QtQuick 2.12
 import QtQuick.Window 2.12
 import Beelab.SpineItem 1.0
 import QtQuick.Controls 1.4
-import Aimy.AimyQml 1.0
 
 Window {
     visible: true
@@ -288,18 +287,6 @@ Window {
             }
         }
     }
-
-
-//    FPSText {
-//        id: fpsText
-//        width: 100
-//        height: 30
-//        Text {
-//            anchors.centerIn: parent
-//            font.pixelSize: 16
-//            text: fpsText.fps
-//        }
-//    }
 
     // animation sequence example.
     Repeater{
