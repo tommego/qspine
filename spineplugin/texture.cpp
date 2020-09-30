@@ -74,6 +74,9 @@ void AimyTextureLoader::load(spine::AtlasPage &page, const spine::String &path)
         glTex->setMipmapFiltering(QSGTexture::Linear);
         m_glTextureHash.insert(tex->name, glTex);
     }
+    else {
+        qWarning() << "window is not found " << m_window;
+    }
 
     page.setRendererObject(tex.get());
     m_textureHash.insert(filePath, tex);

@@ -35,27 +35,27 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     QString animationName = QString(entry->getAnimation()->getName().buffer());
     switch (type) {
     case spine::EventType_Start:{
-        emit spItem->animationStarted(entry->getTrackIndex());
+        emit spItem->animationStarted(entry->getTrackIndex(), animationName);
         emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Interrupt: {
-        emit spItem->animationInterrupted(entry->getTrackIndex());
+        emit spItem->animationInterrupted(entry->getTrackIndex(), animationName);
         emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_End: {
-        emit spItem->animationEnded(entry->getTrackIndex());
+        emit spItem->animationEnded(entry->getTrackIndex(), animationName);
         emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Complete: {
-        emit spItem->animationCompleted(entry->getTrackIndex());
+        emit spItem->animationCompleted(entry->getTrackIndex(), animationName);
         emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Dispose: {
-        emit spItem->animationDisposed(entry->getTrackIndex());
+        emit spItem->animationDisposed(entry->getTrackIndex(), animationName);
         emit spItem->animationUpdated();
         break;
     }
@@ -515,7 +515,8 @@ void SpineItem::batchRenderCmd()
                         batch.vertices,
                         batch.triangles,
                         m_blendColor,
-                        m_blendColorChannel);
+                        m_blendColorChannel,
+                        m_light);
             hasBlend = true;
             m_clipper->clipEnd(*slot);
         }
@@ -592,6 +593,17 @@ void SpineItem::batchRenderCmd()
 void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
 {
     Q_UNUSED(renderer)
+}
+
+float SpineItem::light() const
+{
+    return m_light;
+}
+
+void SpineItem::setLight(float light)
+{
+    m_light = light;
+    emit lightChanged(m_light);
 }
 
 bool SpineItem::debugMesh() const
@@ -827,7 +839,7 @@ void SpineItemWorker::updateSkeletonAnimation()
     }
     m_spItem->m_tickCounter.restart();
 
-    if(m_spItem->m_animationState->getTracks().size() <= 0 || !m_spItem->isVisible())
+    if(m_spItem->m_animationState->getTracks().size() <= 0)
         return;
 
     qint64 msecs = 0;
@@ -878,7 +890,7 @@ void SpineItemWorker::loadResource()
                                    AimyTextureLoader::instance()));
 
     if(m_spItem->m_atlas->getPages().size() == 0) {
-        qWarning() << "Failed to load atlas...";
+        qWarning() << "Failed to load atlas..." << QString(urltospinestring(m_spItem->m_atlasFile).buffer());
         emit m_spItem->resourceLoadFailed();
         return;
     }
@@ -920,13 +932,13 @@ void SpineItemWorker::loadResource()
     m_spItem->m_skeleton->setScaleX(m_spItem->m_skeletonScale * m_spItem->m_scaleX);
     m_spItem->m_skeleton->setScaleY(m_spItem->m_skeletonScale * m_spItem->m_scaleY);
 
-    m_spItem->m_skeleton->updateWorldTransform();
     emit m_spItem->skinsChanged(m_spItem->m_skins);
     emit m_spItem->loadedChanged(m_spItem->m_loaded);
     emit m_spItem->isSkeletonReadyChanged(m_spItem->isSkeletonReady());
-    emit m_spItem->resourceReady();
 
+    m_spItem->m_skeleton->updateWorldTransform();
     m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
     m_spItem->batchRenderCmd();
     emit m_spItem->animationUpdated();
+    emit m_spItem->resourceReady();
 }

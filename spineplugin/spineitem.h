@@ -60,6 +60,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(QObject* vertexEfect READ vertexEfect WRITE setVertexEfect NOTIFY vertexEfectChanged)
     Q_PROPERTY(QColor blendColor READ blendColor WRITE setBlendColor NOTIFY blendColorChanged)
     Q_PROPERTY(int blendColorChannel READ blendColorChannel WRITE setBlendColorChannel NOTIFY blendColorChannelChanged) // -1=none, 0=r, 1=g, 2=b, 3=a, 4=gray
+    Q_PROPERTY(float light READ light WRITE setLight NOTIFY lightChanged)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -184,6 +185,9 @@ public:
     bool debugMesh() const;
     void setDebugMesh(bool debugMesh);
 
+    float light() const;
+    void setLight(float light);
+
 signals:
 
     // property signals
@@ -209,13 +213,14 @@ signals:
     void blendColorChanged(const QColor& color);
     void resourceLoadFailed();
     void blendColorChannelChanged(const int& channel);
+    void lightChanged(const float& light);
 
     // rumtime signals
-    void animationStarted(int trackId);
-    void animationCompleted(int trackId);
-    void animationInterrupted(int trackId);
-    void animationEnded(int trackId);
-    void animationDisposed(int trackId);
+    void animationStarted(int trackId, QString animationName);
+    void animationCompleted(int trackId, QString animationName);
+    void animationInterrupted(int trackId, QString animationName);
+    void animationEnded(int trackId, QString animationName);
+    void animationDisposed(int trackId, QString animationName);
     void cacheRendered();
     void resourceReady();
 
@@ -249,6 +254,7 @@ private:
     qreal m_scaleX = 1.0;
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
+    float m_light = 1.0;
     int m_fps = 25;
     qreal m_defaultMix = 0.1;
     QSize m_sourceSize;

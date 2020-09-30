@@ -12,14 +12,6 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # In order to do so, uncomment the following line.
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 
-!equals(_PRO_FILE_PWD_, $$OUT_PWD) {
-    copy_qmldir.target = $$OUT_PWD/examples/tag
-    copy_qmldir.depends = $$_PRO_FILE_PWD_/examples/tag
-    copy_qmldir.commands = cp -r $$PWD/examples "$$OUT_PWD"
-    QMAKE_EXTRA_TARGETS += copy_qmldir
-    PRE_TARGETDEPS += $$copy_qmldir.target
-}
-
 ARCH = win32
 
 linux-aarch64-gnu-g++:{
@@ -35,6 +27,14 @@ linux-g++:{
 }
 
 DESTDIR = $$PWD/../bin/$$ARCH
+
+!equals(_PRO_FILE_PWD_, $$DESTDIR) {
+    copy_qmldir.target = $$DESTDIR/examples/tag
+    copy_qmldir.depends = $$_PRO_FILE_PWD_/examples/tag
+    copy_qmldir.commands = cp -r $$PWD/examples "$$DESTDIR"
+    QMAKE_EXTRA_TARGETS += copy_qmldir
+    PRE_TARGETDEPS += $$copy_qmldir.target
+}
 
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 

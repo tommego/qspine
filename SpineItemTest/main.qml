@@ -39,7 +39,7 @@ Window {
 
     SpineItem{
         id: mySpine
-        atlasFile: "examples/raptor/export/raptor-pma.atlas"
+        atlasFile: "examples/raptor/export/raptor.atlas"
         skeletonFile: "examples/raptor/export/raptor-pro.json"
         fps: fpsSlider.value
         skeletonScale: scaleSlider.value
@@ -283,6 +283,28 @@ Window {
                     value: 1
                     id: scaleYSlider
                     onValueChanged: mySpine.scaleY = value
+                }
+            }
+        }
+
+        Item{
+            anchors.right: parent.right
+            width: row9.width
+            height: 30
+            Row{
+                id: row9
+                spacing: 5
+                Text{
+                    text: "light: " + String(mySpine.light)
+                }
+
+                Slider{
+                    minimumValue: 0
+                    maximumValue: 1
+                    stepSize: 0.01
+                    value: 1
+                    id: lightSlider
+                    onValueChanged: mySpine.light = value
                 }
             }
         }

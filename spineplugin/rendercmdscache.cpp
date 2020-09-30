@@ -153,11 +153,13 @@ public:
                            spine::Vector<SpineVertex> vertices,
                            spine::Vector<GLushort> triangles,
                            QColor blendColor,
-                           int blendColorChannel)
+                           int blendColorChannel,
+                           float light)
         :mShaderProgram(program)
         ,mTexture(texture)
         ,m_blendColor(blendColor)
         ,m_blendColorChannel(blendColorChannel)
+        ,m_light(light)
     {
         auto numvertices = vertices.size();
         if (triangles.size() <= 0 || numvertices <= 0 || !triangles.buffer())
@@ -186,6 +188,7 @@ public:
         mShaderProgram->setAttributeArray("a_texCoord", GL_FLOAT, &m_vertices[0].u, 2, sizeof(SpineVertex));
         mShaderProgram->setUniformValue("u_blendColor", m_blendColor.redF(), m_blendColor.greenF(), m_blendColor.blueF(), m_blendColor.alphaF());
         mShaderProgram->setUniformValue("u_blendColorChannel", m_blendColorChannel);
+        mShaderProgram->setUniformValue("u_light", m_light);
         glFuncs()->glDrawElements(GL_TRIANGLES, m_triangles.size(), GL_UNSIGNED_SHORT, m_triangles.buffer());
     }
 
@@ -196,6 +199,7 @@ private:
     QSGTexture* mTexture;
     QColor m_blendColor = QColor(255, 255, 255, 255);
     GLint m_blendColorChannel = -1;
+    float m_light = 1.0;
 };
 
 class DrawPolygon: public ICachedGLFunctionCall
@@ -300,11 +304,11 @@ void RenderCmdsCache::clearCache()
 
 void RenderCmdsCache::drawTriangles(QSGTexture* addTexture, spine::Vector<SpineVertex> vertices,
                                     spine::Vector<GLushort> triangles, const QColor& blendColor,
-                                    const int& blendColorChannel)
+                                    const int& blendColorChannel, float light)
 {
     mglFuncs.push_back(new DrawTrigngles(mTextureShaderProgram, addTexture,
                                          vertices, triangles, blendColor,
-                                         blendColorChannel));
+                                         blendColorChannel, light));
 }
 
 void RenderCmdsCache::blendFunc(GLenum sfactor, GLenum dfactor)
@@ -352,15 +356,16 @@ void RenderCmdsCache::drawPoint(const Point &point)
 
 void RenderCmdsCache::render()
 {
+    if (mglFuncs.isEmpty()) {
+        emit cacheRendered();
+        return;
+    }
+
     QOpenGLFunctions* glFuncs = QOpenGLContext::currentContext()->functions();
     glFuncs->glDisable(GL_DEPTH_TEST);
     glFuncs->glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glFuncs->glClear(GL_COLOR_BUFFER_BIT);
 
-    if (mglFuncs.isEmpty()) {
-        emit cacheRendered();
-        return;
-    }
     foreach (ICachedGLFunctionCall* func, mglFuncs)
         func->invoke();
     clearCache();

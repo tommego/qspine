@@ -3,6 +3,7 @@ uniform lowp vec4 u_blendColor;
 uniform int u_blendColorChannel;
 varying mediump vec2 v_texCoord;
 uniform sampler2D u_texture;
+uniform lowp float u_light;
 void main() {
    lowp vec4 t_color = texture2D(u_texture, v_texCoord);
    lowp vec4 ret_color = v_color * t_color;
@@ -22,5 +23,6 @@ void main() {
        lowp float gray = ret_color.r * 0.299 + ret_color.g * 0.587 + ret_color.b * 0.114;
        ret_color = vec4(gray, gray, gray, ret_color.a) * u_blendColor;
    }
+   ret_color = ret_color * vec4(u_light, u_light, u_light, 1.0);
    gl_FragColor = ret_color;
 }
