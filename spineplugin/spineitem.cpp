@@ -839,8 +839,14 @@ void SpineItemWorker::updateSkeletonAnimation()
     }
     m_spItem->m_tickCounter.restart();
 
-    if(m_spItem->m_animationState->getTracks().size() <= 0)
-        return;
+    if(m_spItem->m_animationState->getTracks().size() <= 0) {
+        if(m_fadecounter > 0)
+            m_fadecounter--;
+        else
+            return;
+    }
+    else
+        m_fadecounter = 1;
 
     qint64 msecs = 0;
     if(!m_spItem->m_timer.isValid())

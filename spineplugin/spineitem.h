@@ -296,6 +296,7 @@ public slots:
 
 private:
     SpineItem* m_spItem = nullptr;
+    int m_fadecounter = 1; // make sure last state textue has been render.
 };
 
 #endif // SPINEITEM_H
