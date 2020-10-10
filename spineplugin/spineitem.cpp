@@ -500,7 +500,7 @@ void SpineItem::batchRenderCmd()
                     break;
                 }
                 case spine::BlendMode_Screen: {
-                    m_renderCache->blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR);
+                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
                     break;
                 }
                 default:{
