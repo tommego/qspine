@@ -28,4 +28,5 @@ currently support:
  - deug vertices
  - VertexEffect
  - audio trigger
- -prealphamultiply blending support
+ - prealphamultiply blending support
+ - astc compressed texture support
