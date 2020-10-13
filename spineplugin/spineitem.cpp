@@ -115,6 +115,8 @@ void SpineItem::setToSetupPose()
         return;
     }
     m_skeleton->setToSetupPose();
+    m_animationState->apply(*m_skeleton.get());
+    m_skeleton->updateWorldTransform();
 }
 
 void SpineItem::setBonesToSetupPose()
@@ -167,6 +169,7 @@ void SpineItem::setAnimation(int trackIndex, const QString &name, bool loop)
         return;
     }
     m_animationState->setAnimation(size_t(trackIndex), qstringtospinestring(name), loop);
+    m_timer.restart();
 }
 
 void SpineItem::addAnimation(int trackIndex, const QString &name, bool loop, float delay)
@@ -180,6 +183,7 @@ void SpineItem::addAnimation(int trackIndex, const QString &name, bool loop, flo
         return;
     }
     m_animationState->addAnimation(size_t(trackIndex), qstringtospinestring(name), loop, delay);
+    m_timer.restart();
 }
 
 void SpineItem::setSkin(const QString &skinName)
@@ -382,14 +386,30 @@ void SpineItem::batchRenderCmd()
 
         auto skeletonColor = m_skeleton->getColor();
         auto slotColor = slot->getColor();
+        spine::Color attachmentColor(0, 0, 0, 0);
         spine::Color tint(skeletonColor.r * slotColor.r,
                           skeletonColor.g * slotColor.g,
                           skeletonColor.b * slotColor.b,
                           skeletonColor.a * slotColor.a);
 
+        // TODO: for premultiply alpha handling
+//        spine::Color darkColor;
+
+//        if(slot->hasDarkColor())
+//            darkColor = slot->getDarkColor();
+//        else{
+//            darkColor.r = 0;
+//            darkColor.g = 0;
+//            darkColor.b = 0;
+//        }
+//        darkColor.a = 0;
+
         Texture* texture = nullptr;
         if(attachment->getRTTI().isExactly(spine::RegionAttachment::rtti)) {
             auto regionAttachment = (spine::RegionAttachment*)attachment;
+            attachmentColor.set(regionAttachment->getColor());
+
+            tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             texture = getTexture(regionAttachment);
             batch.vertices.setSize(4, SpineVertex());
             regionAttachment->computeWorldVertices(slot->getBone(),
@@ -406,6 +426,8 @@ void SpineItem::batchRenderCmd()
             memcpy(batch.triangles.buffer(), quadIndices, 6 * sizeof (GLushort));
         } else if (attachment->getRTTI().isExactly(spine::MeshAttachment::rtti)) {
             auto mesh = (spine::MeshAttachment*)attachment;
+            attachmentColor.set(mesh->getColor());
+            tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             size_t numVertices = mesh->getWorldVerticesLength() / 2;
             batch.vertices.setSize(numVertices, SpineVertex());
             texture = getTexture(mesh);
@@ -500,7 +522,7 @@ void SpineItem::batchRenderCmd()
                     break;
                 }
                 case spine::BlendMode_Screen: {
-                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
                     break;
                 }
                 default:{
