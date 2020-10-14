@@ -362,7 +362,6 @@ void SpineItem::batchRenderCmd()
         m_renderCache->setSkeletonRect(m_viewPortRect);
     else
         m_renderCache->setSkeletonRect(m_boundingRect);
-    m_batches.clear();
 
     m_renderCache->bindShader(RenderCmdsCache::ShaderTexture);
 
@@ -381,8 +380,12 @@ void SpineItem::batchRenderCmd()
             continue;
 
         auto name = QString(attachment->getName().buffer());
-        RenderData batch;
-        batch.blendMode = slot->getData().getBlendMode();
+        spine::Vector<SpineVertex> vertices;
+        spine::Vector<GLushort> triangles;
+        Texture* texture = nullptr;
+        int blendMode;
+        blendMode = slot->getData().getBlendMode();
+
 
         auto skeletonColor = m_skeleton->getColor();
         auto slotColor = slot->getColor();
@@ -403,48 +406,46 @@ void SpineItem::batchRenderCmd()
 //            darkColor.b = 0;
 //        }
 //        darkColor.a = 0;
-
-        Texture* texture = nullptr;
         if(attachment->getRTTI().isExactly(spine::RegionAttachment::rtti)) {
             auto regionAttachment = (spine::RegionAttachment*)attachment;
             attachmentColor.set(regionAttachment->getColor());
 
             tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             texture = getTexture(regionAttachment);
-            batch.vertices.setSize(4, SpineVertex());
+            vertices.setSize(4, SpineVertex());
             regionAttachment->computeWorldVertices(slot->getBone(),
-                                                   (float*)batch.vertices.buffer(),
+                                                   (float*)vertices.buffer(),
                                                    0,
                                                    sizeof (SpineVertex) / sizeof (float));
             for(size_t j = 0, l = 0; j < 4; j++,l+=2) {
-                auto &vertex = batch.vertices[j];
+                auto &vertex = vertices[j];
                 vertex.color.set(tint);
                 vertex.u = regionAttachment->getUVs()[l];
                 vertex.v = regionAttachment->getUVs()[l + 1];
             }
-            batch.triangles.setSize(6, 0);
-            memcpy(batch.triangles.buffer(), quadIndices, 6 * sizeof (GLushort));
+            triangles.setSize(6, 0);
+            memcpy(triangles.buffer(), quadIndices, 6 * sizeof (GLushort));
         } else if (attachment->getRTTI().isExactly(spine::MeshAttachment::rtti)) {
             auto mesh = (spine::MeshAttachment*)attachment;
             attachmentColor.set(mesh->getColor());
             tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             size_t numVertices = mesh->getWorldVerticesLength() / 2;
-            batch.vertices.setSize(numVertices, SpineVertex());
+            vertices.setSize(numVertices, SpineVertex());
             texture = getTexture(mesh);
             mesh->computeWorldVertices(*slot,
                                        0,
                                        mesh->getWorldVerticesLength(),
-                                       (float*)batch.vertices.buffer(),
+                                       (float*)vertices.buffer(),
                                        0,
                                        sizeof (SpineVertex) / sizeof (float));
             for (size_t j = 0, l = 0; j < numVertices; j++, l+=2) {
-                auto& vertex = batch.vertices[j];
+                auto& vertex = vertices[j];
                 vertex.color.set(tint);
                 vertex.u = mesh->getUVs()[l];
                 vertex.v = mesh->getUVs()[l+1];
             }
-            batch.triangles.setSize(mesh->getTriangles().size(), 0);
-            memcpy(batch.triangles.buffer(), mesh->getTriangles().buffer(), mesh->getTriangles().size() * sizeof (GLushort));
+            triangles.setSize(mesh->getTriangles().size(), 0);
+            memcpy(triangles.buffer(), mesh->getTriangles().buffer(), mesh->getTriangles().size() * sizeof (GLushort));
 
             if (m_vertexEfect) {
                 // todo
@@ -467,19 +468,19 @@ void SpineItem::batchRenderCmd()
         if(texture) {
             if(m_clipper->isClipping()) {
 
-                auto tmpVerticesCount = batch.vertices.size() * 2;
+                auto tmpVerticesCount = vertices.size() * 2;
                 spine::Vector<float> tmpVertices;
                 spine::Vector<float> tmpUvs;
                 tmpVertices.setSize(tmpVerticesCount, 0);
                 tmpUvs.setSize(tmpVerticesCount, 0);
 
-                for(size_t i = 0; i < batch.vertices.size(); i++) {
-                    tmpVertices[i * 2] = batch.vertices[i].x;
-                    tmpVertices[i * 2 + 1] = batch.vertices[i].y;
-                    tmpUvs[i * 2] = batch.vertices[i].u;
-                    tmpUvs[i * 2 + 1] = batch.vertices[i].v;
+                for(size_t i = 0; i < vertices.size(); i++) {
+                    tmpVertices[i * 2] = vertices[i].x;
+                    tmpVertices[i * 2 + 1] = vertices[i].y;
+                    tmpUvs[i * 2] = vertices[i].u;
+                    tmpUvs[i * 2 + 1] = vertices[i].v;
                 }
-                m_clipper->clipTriangles(tmpVertices.buffer(), batch.triangles.buffer(), batch.triangles.size(), tmpUvs.buffer(), sizeof (short));
+                m_clipper->clipTriangles(tmpVertices.buffer(), triangles.buffer(), triangles.size(), tmpUvs.buffer(), sizeof (short));
                 tmpVertices.setSize(0, 0);
                 tmpUvs.setSize(0, 0);
 
@@ -489,30 +490,30 @@ void SpineItem::batchRenderCmd()
                     m_clipper->clipEnd(*slot);
                     continue;
                 }
-                batch.triangles.setSize(m_clipper->getClippedTriangles().size(), 0);
-                memcpy(batch.triangles.buffer(), m_clipper->getClippedTriangles().buffer(), batch.triangles.size() * sizeof (unsigned short));
+                triangles.setSize(m_clipper->getClippedTriangles().size(), 0);
+                memcpy(triangles.buffer(), m_clipper->getClippedTriangles().buffer(), triangles.size() * sizeof (unsigned short));
                 auto newUvs = m_clipper->getClippedUVs();
                 auto newVertices = m_clipper->getClippedVertices();
-                batch.vertices.setSize(vertCount, SpineVertex());
+                vertices.setSize(vertCount, SpineVertex());
                 for(size_t i = 0; i < vertCount; i++) {
-                    batch.vertices[i].x = newVertices[i * 2];
-                    batch.vertices[i].y = newVertices[i * 2 + 1];
-                    batch.vertices[i].u = newUvs[i * 2];
-                    batch.vertices[i].v = newUvs[i * 2 + 1];
-                    batch.vertices[i].color.set(tint);
+                    vertices[i].x = newVertices[i * 2];
+                    vertices[i].y = newVertices[i * 2 + 1];
+                    vertices[i].u = newUvs[i * 2];
+                    vertices[i].v = newUvs[i * 2 + 1];
+                    vertices[i].color.set(tint);
                 }
             }
-            if(batch.triangles.size() == 0)
+            if(triangles.size() == 0)
                 m_clipper->clipEnd(*slot);
-            batch.texture = texture;
+            texture = texture;
             m_clipper->clipEnd(*slot);
 
-            if(batch.triangles.size() == 0) {
+            if(triangles.size() == 0) {
                 hasBlend = false;
                 continue;
             }
             if(hasBlend) {
-                switch (batch.blendMode) {
+                switch (blendMode) {
                 case spine::BlendMode_Additive: {
                     m_renderCache->blendFunc(GL_ONE, GL_ONE);
                     break;
@@ -531,11 +532,10 @@ void SpineItem::batchRenderCmd()
                 }
                 }
             }
-            m_batches << batch;
             m_renderCache->drawTriangles(
-                        AimyTextureLoader::instance()->getGLTexture(batch.texture,window()),
-                        batch.vertices,
-                        batch.triangles,
+                        AimyTextureLoader::instance()->getGLTexture(texture,window()),
+                        vertices,
+                        triangles,
                         m_blendColor,
                         m_blendColorChannel,
                         m_light);

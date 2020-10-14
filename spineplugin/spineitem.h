@@ -30,13 +30,6 @@ class SkeletonClipping;
 class Slot;
 }
 
-struct RenderData{
-    spine::Vector<SpineVertex> vertices;
-    spine::Vector<GLushort> triangles;
-    Texture* texture = nullptr;
-    int blendMode;
-};
-
 class SpineItem : public QQuickFramebufferObject
 {
     Q_OBJECT
@@ -276,7 +269,6 @@ private:
     QSharedPointer<QTimer> m_lazyLoadTimer;
     QElapsedTimer m_tickCounter;
     QSharedPointer<RenderCmdsCache> m_renderCache;
-    QList<RenderData> m_batches;
     QSharedPointer<SpineItemWorker> m_spWorker;
     QSharedPointer<QThread> m_spWorkerThread;
     QColor m_blendColor;
