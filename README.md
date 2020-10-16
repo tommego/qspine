@@ -22,8 +22,11 @@ currently support:
  - full stack multithread support
  - window, linux, arm/arm64 cross compile project handle
  - support realtime customized blend color on rgba/gray channel
+ - light control
 
  todo:
  - deug vertices
  - VertexEffect
  - audio trigger
+ - prealphamultiply blending support
+ - astc compressed texture support
