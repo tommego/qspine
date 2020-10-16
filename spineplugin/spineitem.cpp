@@ -36,27 +36,32 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     switch (type) {
     case spine::EventType_Start:{
         emit spItem->animationStarted(entry->getTrackIndex(), animationName);
-        emit spItem->animationUpdated();
+        if(spItem->isVisible())
+            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Interrupt: {
         emit spItem->animationInterrupted(entry->getTrackIndex(), animationName);
-        emit spItem->animationUpdated();
+        if(spItem->isVisible())
+            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_End: {
         emit spItem->animationEnded(entry->getTrackIndex(), animationName);
-        emit spItem->animationUpdated();
+        if(spItem->isVisible())
+            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Complete: {
         emit spItem->animationCompleted(entry->getTrackIndex(), animationName);
-        emit spItem->animationUpdated();
+        if(spItem->isVisible())
+            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Dispose: {
         emit spItem->animationDisposed(entry->getTrackIndex(), animationName);
-        emit spItem->animationUpdated();
+        if(spItem->isVisible())
+            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Event: {
@@ -98,6 +103,7 @@ SpineItem::~SpineItem()
     m_spWorker.reset();
     releaseSkeletonRelatedData();
     delete [] m_worldVertices;
+    qInfo() << "SpineItem::~SpineItem()";
 }
 
 QQuickFramebufferObject::Renderer *SpineItem::createRenderer() const
