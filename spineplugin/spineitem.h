@@ -285,6 +285,16 @@ public:
 public slots:
     void updateSkeletonAnimation();
     void loadResource();
+    void setAnimation (int trackIndex, const QString& name, bool loop);
+    void addAnimation (int trackIndex, const QString& name, bool loop, float delay = 0);
+    void setToSetupPose();
+    void setBonesToSetupPose();
+    void setSlotsToSetupPose();
+    void setAttachment(const QString& slotName, const QString& attachmentName);
+    void setMix(const QString& fromAnimation, const QString& toAnimation, float duration);
+    void setSkin(const QString& skinName);
+    void clearTracks ();
+    void clearTrack(int trackIndex = 0);
 
 private:
     SpineItem* m_spItem = nullptr;

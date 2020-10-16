@@ -110,111 +110,69 @@ QQuickFramebufferObject::Renderer *SpineItem::createRenderer() const
 
 void SpineItem::setToSetupPose()
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
-        return;
-    }
-    m_skeleton->setToSetupPose();
-    m_animationState->apply(*m_skeleton.get());
-    m_skeleton->updateWorldTransform();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setToSetupPose");
 }
 
 void SpineItem::setBonesToSetupPose()
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setBonesToSetupPose Error: Skeleton is not ready";
-        return;
-    }
-    m_skeleton->setBonesToSetupPose();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setBonesToSetupPose");
 }
 
 void SpineItem::setSlotsToSetupPose()
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setSlotsToSetupPose Error: Skeleton is not ready";
-        return;
-    }
-    m_skeleton->setSlotsToSetupPose();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setSlotsToSetupPose");
 }
 
 bool SpineItem::setAttachment(const QString &slotName, const QString &attachmentName)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setAttachment Error: Skeleton is not ready";
-        return false;
-    }
-    m_skeleton->setAttachment(spine::String(slotName.toStdString().data()), spine::String(attachmentName.toStdString().data()));
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setAttachment",
+                                  Q_ARG(QString, slotName),
+                                  Q_ARG(QString, attachmentName));
     return true;
 }
 
 void SpineItem::setMix(const QString &fromAnimation, const QString &toAnimation, float duration)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setMix Error: Skeleton is not ready";
-        return;
-    }
-    m_animationStateData->setMix(qstringtospinestring(fromAnimation),
-                                 qstringtospinestring(toAnimation),
-                                 duration);
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setMix",
+                                  Q_ARG(QString, fromAnimation),
+                                  Q_ARG(QString, toAnimation),
+                                  Q_ARG(float, duration));
 }
 
 void SpineItem::setAnimation(int trackIndex, const QString &name, bool loop)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setAnimation Error: Skeleton is not ready";
-        return;
-    }
-    if(!m_animations.contains(name)) {
-        qWarning() << "no " << name << " found, vailable is : " << m_animations;
-        return;
-    }
-    m_animationState->setAnimation(size_t(trackIndex), qstringtospinestring(name), loop);
-    m_timer.restart();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setAnimation", Q_ARG(int, trackIndex), Q_ARG(QString, name), Q_ARG(bool, loop));
 }
 
 void SpineItem::addAnimation(int trackIndex, const QString &name, bool loop, float delay)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::addAnimation Error: Skeleton is not ready";
-        return;
-    }
-    if(!m_animations.contains(name)) {
-        qWarning() << "no " << name << " found, vailable is : " << m_animations;
-        return;
-    }
-    m_animationState->addAnimation(size_t(trackIndex), qstringtospinestring(name), loop, delay);
-    m_timer.restart();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "addAnimation", Q_ARG(int, trackIndex), Q_ARG(QString, name), Q_ARG(bool, loop), Q_ARG(float, delay));
 }
 
 void SpineItem::setSkin(const QString &skinName)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::setSkin Error: Skeleton is not ready";
-        return;
-    }
-    qInfo() << "setting skin " << skinName;
-    if(!m_skins.contains(skinName)) {
-        qWarning() <<  "no " << skinName << " found, vailable skins is: " << m_skins;
-    }
-    m_skeleton->setSkin(skinName.toStdString().c_str());
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "setSkin",
+                                  Q_ARG(QString, skinName));
 }
 
 void SpineItem::clearTracks()
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::clearTracks Error: Skeleton is not ready";
-        return;
-    }
-    m_animationState->clearTracks();
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "clearTracks");
 }
 
 void SpineItem::clearTrack(int trackIndex)
 {
-    if(!isSkeletonReady()) {
-        qWarning() << "SpineItem::clearTrack Error: Skeleton is not ready";
-        return;
-    }
-    m_animationState->clearTrack(size_t(trackIndex));
+    if(m_spWorkerThread->isRunning() && m_spWorker)
+        QMetaObject::invokeMethod(m_spWorker.get(), "clearTrack", Q_ARG(int, trackIndex));
 }
 
 QUrl SpineItem::atlasFile() const
@@ -969,4 +927,112 @@ void SpineItemWorker::loadResource()
     m_spItem->batchRenderCmd();
     emit m_spItem->animationUpdated();
     emit m_spItem->resourceReady();
+}
+
+void SpineItemWorker::setAnimation(int trackIndex, const QString &name, bool loop)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setAnimation Error: Skeleton is not ready";
+        return;
+    }
+    if(!m_spItem->m_animations.contains(name)) {
+        qWarning() << "no " << name << " found, vailable is : " << m_spItem->m_animations;
+        return;
+    }
+    m_spItem->m_animationState->setAnimation(size_t(trackIndex), qstringtospinestring(name), loop);
+    m_spItem->m_timer.restart();
+}
+
+void SpineItemWorker::addAnimation(int trackIndex, const QString &name, bool loop, float delay)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::addAnimation Error: Skeleton is not ready";
+        return;
+    }
+    if(!m_spItem->m_animations.contains(name)) {
+        qWarning() << "no " << name << " found, vailable is : " << m_spItem->m_animations;
+        return;
+    }
+    m_spItem->m_animationState->addAnimation(size_t(trackIndex), qstringtospinestring(name), loop, delay);
+    m_spItem->m_timer.restart();
+}
+
+void SpineItemWorker::setToSetupPose()
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setToSetupPose Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_skeleton->setToSetupPose();
+    m_spItem->m_animationState->apply(*m_spItem->m_skeleton.get());
+    m_spItem->m_skeleton->updateWorldTransform();
+}
+
+void SpineItemWorker::setBonesToSetupPose()
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setBonesToSetupPose Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_skeleton->setBonesToSetupPose();
+}
+
+void SpineItemWorker::setSlotsToSetupPose()
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setSlotsToSetupPose Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_skeleton->setSlotsToSetupPose();
+}
+
+void SpineItemWorker::setAttachment(const QString &slotName, const QString &attachmentName)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setAttachment Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_skeleton->setAttachment(spine::String(slotName.toStdString().data()), spine::String(attachmentName.toStdString().data()));
+}
+
+void SpineItemWorker::setMix(const QString &fromAnimation, const QString &toAnimation, float duration)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setMix Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_animationStateData->setMix(qstringtospinestring(fromAnimation),
+                                 qstringtospinestring(toAnimation),
+                                 duration);
+}
+
+void SpineItemWorker::setSkin(const QString &skinName)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::setSkin Error: Skeleton is not ready";
+        return;
+    }
+    qInfo() << "setting skin " << skinName;
+    if(!m_spItem->m_skins.contains(skinName)) {
+        qWarning() <<  "no " << skinName << " found, vailable skins is: " << m_spItem->m_skins;
+    }
+    m_spItem->m_skeleton->setSkin(skinName.toStdString().c_str());
+}
+
+void SpineItemWorker::clearTracks()
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::clearTracks Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_animationState->clearTracks();
+}
+
+void SpineItemWorker::clearTrack(int trackIndex)
+{
+    if(!m_spItem->isSkeletonReady()) {
+        qWarning() << "SpineItem::clearTrack Error: Skeleton is not ready";
+        return;
+    }
+    m_spItem->m_animationState->clearTrack(size_t(trackIndex));
 }

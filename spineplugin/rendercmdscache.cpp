@@ -289,6 +289,8 @@ RenderCmdsCache::~RenderCmdsCache()
         delete mTextureShaderProgram;
     if(mColorShaderProgram)
         delete mColorShaderProgram;
+    mTextureShaderProgram = nullptr;
+    mColorShaderProgram = nullptr;
 }
 
 void RenderCmdsCache::clearCache()
@@ -356,6 +358,8 @@ void RenderCmdsCache::drawPoint(const Point &point)
 
 void RenderCmdsCache::render()
 {
+    if(!mTextureShaderProgram || !mColorShaderProgram)
+        return;
     if (mglFuncs.isEmpty()) {
         emit cacheRendered();
         return;

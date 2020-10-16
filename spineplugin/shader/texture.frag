@@ -24,6 +24,6 @@ void main() {
        ret_color = vec4(gray, gray, gray, ret_color.a) * u_blendColor;
    }
    ret_color = ret_color * vec4(u_light, u_light, u_light, 1.0);
-   ret_color = ret_color * ret_color.a; // multiply alpha to filter mess color
+   ret_color = ret_color * v_color.a; // multiply alpha to filter mess color
    gl_FragColor = ret_color;
 }
