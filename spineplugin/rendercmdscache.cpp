@@ -172,10 +172,6 @@ public:
 
     virtual ~DrawTrigngles()
     {
-        if(m_vertices.buffer())
-            m_vertices.setSize(0, SpineVertex());
-        if(m_triangles.buffer())
-            m_triangles.setSize(0, 0);
     }
 
     virtual void invoke()

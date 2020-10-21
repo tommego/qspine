@@ -30,6 +30,13 @@ class SkeletonClipping;
 class Slot;
 }
 
+struct RenderCmdBatch{
+    spine::Vector<SpineVertex> vertices;
+    spine::Vector<GLushort> triangles;
+    Texture* texture = nullptr;
+    int blendMode;
+};
+
 class SpineItem : public QQuickFramebufferObject
 {
     Q_OBJECT
@@ -54,6 +61,7 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(QColor blendColor READ blendColor WRITE setBlendColor NOTIFY blendColorChanged)
     Q_PROPERTY(int blendColorChannel READ blendColorChannel WRITE setBlendColorChannel NOTIFY blendColorChannelChanged) // -1=none, 0=r, 1=g, 2=b, 3=a, 4=gray
     Q_PROPERTY(float light READ light WRITE setLight NOTIFY lightChanged)
+    Q_PROPERTY(bool asynchronous READ asynchronous WRITE setAsynchronous NOTIFY asynchronousChanged)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -181,6 +189,9 @@ public:
     float light() const;
     void setLight(float light);
 
+    bool asynchronous() const;
+    void setAsynchronous(bool asynchronous);
+
 signals:
 
     // property signals
@@ -207,6 +218,7 @@ signals:
     void resourceLoadFailed();
     void blendColorChannelChanged(const int& channel);
     void lightChanged(const float& light);
+    void asynchronousChanged(const bool& asynchronous);
 
     // rumtime signals
     void animationStarted(int trackId, QString animationName);
@@ -244,6 +256,7 @@ private:
     bool m_debugMesh = false;
     bool m_isLoading = false;
     bool m_hasViewPort = false;
+    bool m_asynchronous = true;
     qreal m_scaleX = 1.0;
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
@@ -275,6 +288,8 @@ private:
     bool m_componentCompleted = false;
     int m_blendColorChannel = -1;
     bool m_requestDestroy = false;
+    std::vector<RenderCmdBatch> m_batches;
+    bool m_requestRender = false;
 };
 
 class SpineItemWorker: public QObject{

@@ -42,26 +42,18 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     }
     case spine::EventType_Interrupt: {
         emit spItem->animationInterrupted(entry->getTrackIndex(), animationName);
-        if(spItem->isVisible())
-            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_End: {
         emit spItem->animationEnded(entry->getTrackIndex(), animationName);
-        if(spItem->isVisible())
-            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Complete: {
         emit spItem->animationCompleted(entry->getTrackIndex(), animationName);
-        if(spItem->isVisible())
-            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Dispose: {
         emit spItem->animationDisposed(entry->getTrackIndex(), animationName);
-        if(spItem->isVisible())
-            emit spItem->animationUpdated();
         break;
     }
     case spine::EventType_Event: {
@@ -87,7 +79,8 @@ SpineItem::SpineItem(QQuickItem *parent) :
     connect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
     connect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
     connect(this, &SpineItem::visibleChanged, this, &SpineItem::onVisibleChanged);
-    m_spWorker->moveToThread(m_spWorkerThread.get());
+    if(m_asynchronous)
+        m_spWorker->moveToThread(m_spWorkerThread.get());
     m_spWorkerThread->start();
 }
 
@@ -318,18 +311,13 @@ static unsigned short quadIndices[] = {0, 1, 2, 2, 3, 0};
 
 void SpineItem::batchRenderCmd()
 {
+    if(m_requestRender)
+        return;
+    m_requestRender = true;
     if(!m_renderCache || !m_renderCache->isValid() || !m_componentCompleted)
         return;
 
-    // batching
-    if(m_hasViewPort)
-        m_renderCache->setSkeletonRect(m_viewPortRect);
-    else
-        m_renderCache->setSkeletonRect(m_boundingRect);
-
-    m_renderCache->bindShader(RenderCmdsCache::ShaderTexture);
-
-    bool hasBlend = false;
+    m_batches.clear();
 
     for(size_t i = 0, n = m_skeleton->getSlots().size(); i < n; ++i) {
         auto slot = m_skeleton->getDrawOrder()[i];
@@ -343,9 +331,11 @@ void SpineItem::batchRenderCmd()
         if (!attachment)
             continue;
 
+        RenderCmdBatch batch;
+
         auto name = QString(attachment->getName().buffer());
-        spine::Vector<SpineVertex> vertices;
-        spine::Vector<GLushort> triangles;
+//        spine::Vector<SpineVertex> vertices;
+//        spine::Vector<GLushort> triangles;
         Texture* texture = nullptr;
         int blendMode;
         blendMode = slot->getData().getBlendMode();
@@ -376,40 +366,40 @@ void SpineItem::batchRenderCmd()
 
             tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             texture = getTexture(regionAttachment);
-            vertices.setSize(4, SpineVertex());
+            batch.vertices.setSize(4, SpineVertex());
             regionAttachment->computeWorldVertices(slot->getBone(),
-                                                   (float*)vertices.buffer(),
+                                                   (float*)batch.vertices.buffer(),
                                                    0,
                                                    sizeof (SpineVertex) / sizeof (float));
             for(size_t j = 0, l = 0; j < 4; j++,l+=2) {
-                auto &vertex = vertices[j];
+                auto &vertex = batch.vertices[j];
                 vertex.color.set(tint);
                 vertex.u = regionAttachment->getUVs()[l];
                 vertex.v = regionAttachment->getUVs()[l + 1];
             }
-            triangles.setSize(6, 0);
-            memcpy(triangles.buffer(), quadIndices, 6 * sizeof (GLushort));
+            batch.triangles.setSize(6, 0);
+            memcpy(batch.triangles.buffer(), quadIndices, 6 * sizeof (GLushort));
         } else if (attachment->getRTTI().isExactly(spine::MeshAttachment::rtti)) {
             auto mesh = (spine::MeshAttachment*)attachment;
             attachmentColor.set(mesh->getColor());
             tint.set(tint.r * attachmentColor.r, tint.g * attachmentColor.g, tint.b * attachmentColor.b, tint.a * attachmentColor.a);
             size_t numVertices = mesh->getWorldVerticesLength() / 2;
-            vertices.setSize(numVertices, SpineVertex());
+            batch.vertices.setSize(numVertices, SpineVertex());
             texture = getTexture(mesh);
             mesh->computeWorldVertices(*slot,
                                        0,
                                        mesh->getWorldVerticesLength(),
-                                       (float*)vertices.buffer(),
+                                       (float*)batch.vertices.buffer(),
                                        0,
                                        sizeof (SpineVertex) / sizeof (float));
             for (size_t j = 0, l = 0; j < numVertices; j++, l+=2) {
-                auto& vertex = vertices[j];
+                auto& vertex = batch.vertices[j];
                 vertex.color.set(tint);
                 vertex.u = mesh->getUVs()[l];
                 vertex.v = mesh->getUVs()[l+1];
             }
-            triangles.setSize(mesh->getTriangles().size(), 0);
-            memcpy(triangles.buffer(), mesh->getTriangles().buffer(), mesh->getTriangles().size() * sizeof (GLushort));
+            batch.triangles.setSize(mesh->getTriangles().size(), 0);
+            memcpy(batch.triangles.buffer(), mesh->getTriangles().buffer(), mesh->getTriangles().size() * sizeof (GLushort));
 
             if (m_vertexEfect) {
                 // todo
@@ -432,19 +422,19 @@ void SpineItem::batchRenderCmd()
         if(texture) {
             if(m_clipper->isClipping()) {
 
-                auto tmpVerticesCount = vertices.size() * 2;
+                auto tmpVerticesCount = batch.vertices.size() * 2;
                 spine::Vector<float> tmpVertices;
                 spine::Vector<float> tmpUvs;
                 tmpVertices.setSize(tmpVerticesCount, 0);
                 tmpUvs.setSize(tmpVerticesCount, 0);
 
-                for(size_t i = 0; i < vertices.size(); i++) {
-                    tmpVertices[i * 2] = vertices[i].x;
-                    tmpVertices[i * 2 + 1] = vertices[i].y;
-                    tmpUvs[i * 2] = vertices[i].u;
-                    tmpUvs[i * 2 + 1] = vertices[i].v;
+                for(size_t i = 0; i < batch.vertices.size(); i++) {
+                    tmpVertices[i * 2] = batch.vertices[i].x;
+                    tmpVertices[i * 2 + 1] = batch.vertices[i].y;
+                    tmpUvs[i * 2] = batch.vertices[i].u;
+                    tmpUvs[i * 2 + 1] = batch.vertices[i].v;
                 }
-                m_clipper->clipTriangles(tmpVertices.buffer(), triangles.buffer(), triangles.size(), tmpUvs.buffer(), sizeof (short));
+                m_clipper->clipTriangles(tmpVertices.buffer(), batch.triangles.buffer(), batch.triangles.size(), tmpUvs.buffer(), sizeof (short));
                 tmpVertices.setSize(0, 0);
                 tmpUvs.setSize(0, 0);
 
@@ -454,131 +444,169 @@ void SpineItem::batchRenderCmd()
                     m_clipper->clipEnd(*slot);
                     continue;
                 }
-                triangles.setSize(m_clipper->getClippedTriangles().size(), 0);
-                memcpy(triangles.buffer(), m_clipper->getClippedTriangles().buffer(), triangles.size() * sizeof (unsigned short));
+                batch.triangles.setSize(m_clipper->getClippedTriangles().size(), 0);
+                memcpy(batch.triangles.buffer(), m_clipper->getClippedTriangles().buffer(), batch.triangles.size() * sizeof (unsigned short));
                 auto newUvs = m_clipper->getClippedUVs();
                 auto newVertices = m_clipper->getClippedVertices();
-                vertices.setSize(vertCount, SpineVertex());
+                batch.vertices.setSize(vertCount, SpineVertex());
                 for(size_t i = 0; i < vertCount; i++) {
-                    vertices[i].x = newVertices[i * 2];
-                    vertices[i].y = newVertices[i * 2 + 1];
-                    vertices[i].u = newUvs[i * 2];
-                    vertices[i].v = newUvs[i * 2 + 1];
-                    vertices[i].color.set(tint);
+                    batch.vertices[i].x = newVertices[i * 2];
+                    batch.vertices[i].y = newVertices[i * 2 + 1];
+                    batch.vertices[i].u = newUvs[i * 2];
+                    batch.vertices[i].v = newUvs[i * 2 + 1];
+                    batch.vertices[i].color.set(tint);
                 }
             }
-            if(triangles.size() == 0)
+            if(batch.triangles.size() == 0)
                 m_clipper->clipEnd(*slot);
-            texture = texture;
-            m_clipper->clipEnd(*slot);
 
-            if(triangles.size() == 0) {
-                hasBlend = false;
-                continue;
-            }
-            if(hasBlend) {
-                switch (blendMode) {
-                case spine::BlendMode_Additive: {
-                    m_renderCache->blendFunc(GL_ONE, GL_ONE);
-                    break;
-                }
-                case spine::BlendMode_Multiply: {
-                    m_renderCache->blendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
-                    break;
-                }
-                case spine::BlendMode_Screen: {
-                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
-                    break;
-                }
-                default:{
-                    m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-                    break;
-                }
-                }
-            }
-            m_renderCache->drawTriangles(
-                        AimyTextureLoader::instance()->getGLTexture(texture,window()),
-                        vertices,
-                        triangles,
-                        m_blendColor,
-                        m_blendColorChannel,
-                        m_light);
-            hasBlend = true;
+            batch.texture = texture;
+            batch.blendMode = blendMode;
+            m_batches.push_back(batch);
             m_clipper->clipEnd(*slot);
         }
     }
     m_clipper->clipEnd();
-
-    // debug drawing
-    if(m_debugBones || m_debugSlots || m_debugMesh) {
-        m_renderCache->bindShader(RenderCmdsCache::ShaderColor);
-        m_renderCache->blendFunc(GL_ONE, GL_ZERO);
-
-        if(m_debugSlots) {
-            m_renderCache->drawColor(200, 40, 150, 255);
-            m_renderCache->lineWidth(1);
-            Point points[4];
-            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
-                auto slot = m_skeleton->getSlots()[i];
-                if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::RegionAttachment::rtti))
-                    continue;
-                auto* regionAttachment = (spine::RegionAttachment*)slot->getAttachment();
-                regionAttachment->computeWorldVertices(slot->getBone(), m_worldVertices, 0, 2);
-                points[0] = Point(m_worldVertices[0], m_worldVertices[1]);
-                points[1] = Point(m_worldVertices[2], m_worldVertices[3]);
-                points[2] = Point(m_worldVertices[4], m_worldVertices[5]);
-                points[3] = Point(m_worldVertices[6], m_worldVertices[7]);
-                m_renderCache->drawPoly(points, 4);
-            }
-        }
-
-        if(m_debugMesh) {
-            spine::Vector<Point> points;
-            m_renderCache->drawColor(40, 150, 200, 255);
-            for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
-                auto slot = m_skeleton->getSlots()[i];
-                if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::MeshAttachment::rtti))
-                    continue;
-                auto* mesh = (spine::MeshAttachment*)slot->getAttachment();
-                size_t numVertices = mesh->getWorldVerticesLength() / 2;
-                points.setSize(numVertices, Point());
-                mesh->computeWorldVertices(*slot,
-                                           0,
-                                           mesh->getWorldVerticesLength(),
-                                           (float*)points.buffer(),
-                                           0,
-                                           sizeof (Point) / sizeof (float));
-                m_renderCache->drawPoly(points.buffer(), points.size());
-            }
-        }
-
-        if(m_debugBones) {
-            m_renderCache->drawColor(200, 150, 40, 255);
-            m_renderCache->lineWidth(2);
-            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
-                m_skeleton->updateWorldTransform();
-                auto bone = m_skeleton->getBones()[i];
-                if(!bone->isActive()) continue;
-                float x = bone->getData().getLength() * bone->getA() + bone->getWorldX();
-                float y = bone->getData().getLength() * bone->getC() + bone->getWorldY();
-                Point p0(bone->getWorldX(), bone->getWorldY());
-                Point p1(x, y);
-                m_renderCache->drawLine(p0, p1);
-            }
-//            cache->drawColor(0, 0, 255, 255);
-            m_renderCache->pointSize(4.0);
-            for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
-                auto bone = m_skeleton->getBones()[i];
-                m_renderCache->drawPoint(Point(bone->getWorldX(), bone->getWorldY()));
-                if(i == 0) m_renderCache->drawColor(0, 255, 0,255);
-            }
-        }
-    }
 }
 
 void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
 {
-    Q_UNUSED(renderer)
+    if(!renderer)
+        return;
+
+    if(!m_renderCache || !m_renderCache->isValid() || !m_componentCompleted)
+        return;
+
+    if(m_hasViewPort)
+        m_renderCache->setSkeletonRect(m_viewPortRect);
+    else
+        m_renderCache->setSkeletonRect(m_boundingRect);
+
+    m_renderCache->bindShader(RenderCmdsCache::ShaderTexture);
+    bool hasBlend = false;
+    foreach (const auto& batch, m_batches) {
+        if(!batch.texture)
+            continue;
+        if(batch.triangles.size() == 0) {
+            hasBlend = false;
+            continue;
+        }
+        if(hasBlend) {
+            switch (batch.blendMode) {
+            case spine::BlendMode_Additive: {
+                m_renderCache->blendFunc(GL_ONE, GL_ONE);
+                break;
+            }
+            case spine::BlendMode_Multiply: {
+                m_renderCache->blendFunc(GL_DST_COLOR, GL_ONE_MINUS_SRC_COLOR);
+                break;
+            }
+            case spine::BlendMode_Screen: {
+                m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+                break;
+            }
+            default:{
+                m_renderCache->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                break;
+            }
+            }
+        }
+
+        m_renderCache->drawTriangles(
+                    AimyTextureLoader::instance()->getGLTexture(batch.texture,window()),
+                    batch.vertices,
+                    batch.triangles,
+                    m_blendColor,
+                    m_blendColorChannel,
+                    m_light);
+        hasBlend = true;
+
+        // debug drawing
+        if(m_debugBones || m_debugSlots || m_debugMesh) {
+            m_renderCache->bindShader(RenderCmdsCache::ShaderColor);
+            m_renderCache->blendFunc(GL_ONE, GL_ZERO);
+
+            if(m_debugSlots) {
+                m_renderCache->drawColor(200, 40, 150, 255);
+                m_renderCache->lineWidth(1);
+                Point points[4];
+                for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+                    auto slot = m_skeleton->getSlots()[i];
+                    if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::RegionAttachment::rtti))
+                        continue;
+                    auto* regionAttachment = (spine::RegionAttachment*)slot->getAttachment();
+                    regionAttachment->computeWorldVertices(slot->getBone(), m_worldVertices, 0, 2);
+                    points[0] = Point(m_worldVertices[0], m_worldVertices[1]);
+                    points[1] = Point(m_worldVertices[2], m_worldVertices[3]);
+                    points[2] = Point(m_worldVertices[4], m_worldVertices[5]);
+                    points[3] = Point(m_worldVertices[6], m_worldVertices[7]);
+                    m_renderCache->drawPoly(points, 4);
+                }
+            }
+
+            if(m_debugMesh) {
+                spine::Vector<Point> points;
+                m_renderCache->drawColor(40, 150, 200, 255);
+                for (size_t i = 0, n = m_skeleton->getSlots().size(); i < n; i++) {
+                    auto slot = m_skeleton->getSlots()[i];
+                    if(!slot->getAttachment() || !slot->getAttachment()->getRTTI().isExactly(spine::MeshAttachment::rtti))
+                        continue;
+                    auto* mesh = (spine::MeshAttachment*)slot->getAttachment();
+                    size_t numVertices = mesh->getWorldVerticesLength() / 2;
+                    points.setSize(numVertices, Point());
+                    mesh->computeWorldVertices(*slot,
+                                               0,
+                                               mesh->getWorldVerticesLength(),
+                                               (float*)points.buffer(),
+                                               0,
+                                               sizeof (Point) / sizeof (float));
+                    m_renderCache->drawPoly(points.buffer(), points.size());
+                }
+            }
+
+            if(m_debugBones) {
+                m_renderCache->drawColor(200, 150, 40, 255);
+                m_renderCache->lineWidth(2);
+                for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
+                    m_skeleton->updateWorldTransform();
+                    auto bone = m_skeleton->getBones()[i];
+                    if(!bone->isActive()) continue;
+                    float x = bone->getData().getLength() * bone->getA() + bone->getWorldX();
+                    float y = bone->getData().getLength() * bone->getC() + bone->getWorldY();
+                    Point p0(bone->getWorldX(), bone->getWorldY());
+                    Point p1(x, y);
+                    m_renderCache->drawLine(p0, p1);
+                }
+    //            cache->drawColor(0, 0, 255, 255);
+                m_renderCache->pointSize(4.0);
+                for(int i = 0, n = m_skeleton->getBones().size(); i < n; i++) {
+                    auto bone = m_skeleton->getBones()[i];
+                    m_renderCache->drawPoint(Point(bone->getWorldX(), bone->getWorldY()));
+                    if(i == 0) m_renderCache->drawColor(0, 255, 0,255);
+                }
+            }
+        }
+    }
+    m_requestRender = false;
+}
+
+bool SpineItem::asynchronous() const
+{
+    return m_asynchronous;
+}
+
+void SpineItem::setAsynchronous(bool asynchronous)
+{
+    if(m_asynchronous == asynchronous)
+        return;
+
+    m_asynchronous = asynchronous;
+    if(m_asynchronous) {
+        m_spWorker->moveToThread(m_spWorkerThread.get());
+    } else{
+        m_spWorker->moveToThread(qApp->thread());
+    }
+    emit asynchronousChanged(m_asynchronous);
 }
 
 float SpineItem::light() const
@@ -932,6 +960,7 @@ void SpineItemWorker::loadResource()
     m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
     m_spItem->batchRenderCmd();
     emit m_spItem->animationUpdated();
+    QThread::msleep(20);
     emit m_spItem->resourceReady();
 }
 
