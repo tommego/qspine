@@ -36,8 +36,10 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     switch (type) {
     case spine::EventType_Start:{
         emit spItem->animationStarted(entry->getTrackIndex(), animationName);
-        if(spItem->isVisible())
+        if(spItem->isVisible() && !spItem->m_animating) {
+            spItem->m_animating = true;
             emit spItem->animationUpdated();
+        }
         break;
     }
     case spine::EventType_Interrupt: {
@@ -853,7 +855,7 @@ void SpineItemWorker::updateSkeletonAnimation()
     }
     m_spItem->m_tickCounter.restart();
 
-    if(m_spItem->m_animationState->getTracks().size() <= 0) {
+    if(m_spItem->m_animationState->getTracks().size() <= 0 || !m_spItem->isVisible()) {
         if(m_fadecounter > 0)
             m_fadecounter--;
         else
@@ -1061,6 +1063,7 @@ void SpineItemWorker::clearTracks()
         return;
     }
     m_spItem->m_animationState->clearTracks();
+    m_spItem->m_animating = false;
 }
 
 void SpineItemWorker::clearTrack(int trackIndex)
@@ -1070,4 +1073,6 @@ void SpineItemWorker::clearTrack(int trackIndex)
         return;
     }
     m_spItem->m_animationState->clearTrack(size_t(trackIndex));
+    if(m_spItem->m_animationState->getTracks().size() <= 0)
+        m_spItem->m_animating = false;
 }

@@ -128,6 +128,8 @@ public:
     friend class SpineItemWorker;
     friend class SkeletonRenderer;
 
+    friend void animationSateListioner(spine::AnimationState* state, spine::EventType type, spine::TrackEntry* entry, spine::Event* event);
+
     QUrl atlasFile() const;
     void setAtlasFile(const QUrl &atlasPath);
 
@@ -257,6 +259,7 @@ private:
     bool m_isLoading = false;
     bool m_hasViewPort = false;
     bool m_asynchronous = true;
+    bool m_animating = false;
     qreal m_scaleX = 1.0;
     qreal m_scaleY = 1.0;
     qreal m_timeScale = 1.0;
