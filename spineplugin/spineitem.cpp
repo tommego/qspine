@@ -892,7 +892,7 @@ void SpineItemWorker::updateSkeletonAnimation()
         m_spItem->m_tickCounter.restart();
     else{
         auto sleepCount = 1000.0 / m_spItem->m_fps - m_spItem->m_tickCounter.elapsed();
-        if(sleepCount > 0)
+        if(sleepCount > 0 && sleepCount < 100)
             QThread::msleep(sleepCount);
     }
     m_spItem->m_tickCounter.restart();
