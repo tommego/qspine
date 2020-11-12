@@ -35,6 +35,8 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
     QString animationName = QString(entry->getAnimation()->getName().buffer());
     switch (type) {
     case spine::EventType_Start:{
+        if(spItem->m_requestDestroy)
+            return;
         emit spItem->animationStarted(entry->getTrackIndex(), animationName);
         if(spItem->isVisible() && !spItem->m_animating) {
             spItem->m_animating = true;
@@ -43,18 +45,26 @@ void animationSateListioner(spine::AnimationState* state, spine::EventType type,
         break;
     }
     case spine::EventType_Interrupt: {
+        if(spItem->m_requestDestroy)
+            return;
         emit spItem->animationInterrupted(entry->getTrackIndex(), animationName);
         break;
     }
     case spine::EventType_End: {
+        if(spItem->m_requestDestroy)
+            return;
         emit spItem->animationEnded(entry->getTrackIndex(), animationName);
         break;
     }
     case spine::EventType_Complete: {
+        if(spItem->m_requestDestroy)
+            return;
         emit spItem->animationCompleted(entry->getTrackIndex(), animationName);
         break;
     }
     case spine::EventType_Dispose: {
+        if(spItem->m_requestDestroy)
+            return;
         emit spItem->animationDisposed(entry->getTrackIndex(), animationName);
         break;
     }
@@ -73,11 +83,12 @@ SpineItem::SpineItem(QQuickItem *parent) :
     m_spWorker(new SpineItemWorker(nullptr, this)),
     m_spWorkerThread(new QThread)
 {
+    AimyTextureLoader::instance(); // make sure this has been initialized.
     m_blendColor = QColor(255, 255, 255, 255);
     m_lazyLoadTimer->setSingleShot(true);
     m_lazyLoadTimer->setInterval(50);
     m_worldVertices = new float[2000];
-    connect(m_lazyLoadTimer.get(), &QTimer::timeout, [=]{releaseSkeletonRelatedData();loadResource();});
+    connect(m_lazyLoadTimer.get(), &QTimer::timeout, this, &SpineItem::reloadResource);
     connect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
     connect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
     connect(this, &SpineItem::visibleChanged, this, &SpineItem::onVisibleChanged);
@@ -89,6 +100,9 @@ SpineItem::SpineItem(QQuickItem *parent) :
 SpineItem::~SpineItem()
 {
     disconnect(m_renderCache.get(), &RenderCmdsCache::cacheRendered, this, &SpineItem::onCacheRendered);
+    disconnect(this, &SpineItem::animationUpdated, this, &SpineItem::updateBoundingRect);
+    disconnect(m_lazyLoadTimer.get(), &QTimer::timeout, this, &SpineItem::reloadResource);
+    disconnect(this, &SpineItem::visibleChanged, this, &SpineItem::onVisibleChanged);
 
     if(m_animationState)
         m_animationState->clearTracks();
@@ -98,11 +112,12 @@ SpineItem::~SpineItem()
     m_spWorker.reset();
     releaseSkeletonRelatedData();
     delete [] m_worldVertices;
-    qInfo() << "SpineItem::~SpineItem()";
 }
 
 QQuickFramebufferObject::Renderer *SpineItem::createRenderer() const
 {
+    if(!window())
+        return nullptr;
     auto renderer = new SkeletonRenderer();
     m_renderCache->initShaderProgram();
     renderer->setCache(m_renderCache);
@@ -592,6 +607,27 @@ void SpineItem::renderToCache(QQuickFramebufferObject::Renderer *renderer)
     m_requestRender = false;
 }
 
+bool SpineItem::forceRenderOnHidden() const
+{
+    return m_forceRenderOnHidden;
+}
+
+void SpineItem::setForceRenderOnHidden(bool forceRenderOnHidden)
+{
+    m_forceRenderOnHidden = forceRenderOnHidden;
+    emit forceRenderOnHiddenChanged(m_forceRenderOnHidden);
+}
+
+void SpineItem::classBegin()
+{
+}
+
+void SpineItem::componentComplete()
+{
+    QQuickFramebufferObject::componentComplete();
+    m_componentCompleted = true;
+}
+
 bool SpineItem::asynchronous() const
 {
     return m_asynchronous;
@@ -655,12 +691,6 @@ void SpineItem::setBlendColor(const QColor &color)
     emit blendColorChanged(color);
 }
 
-void SpineItem::componentComplete()
-{
-    QQuickFramebufferObject::componentComplete();
-    m_componentCompleted = true;
-}
-
 QObject *SpineItem::vertexEfect() const
 {
     return (QObject*)m_vertexEfect;
@@ -679,6 +709,8 @@ qreal SpineItem::scaleY() const
 
 void SpineItem::setScaleY(const qreal &value)
 {
+    if(m_requestDestroy || m_isLoading)
+        return;
     m_scaleY = value;
     if(isSkeletonReady())
         m_skeleton->setScaleY(m_scaleY * m_skeletonScale);
@@ -692,6 +724,8 @@ qreal SpineItem::scaleX() const
 
 void SpineItem::setScaleX(const qreal &value)
 {
+    if(m_requestDestroy || m_isLoading)
+        return;
     m_scaleX = value;
     if(isSkeletonReady())
         m_skeleton->setScaleX(m_scaleX * m_skeletonScale);
@@ -746,7 +780,7 @@ qreal SpineItem::skeletonScale() const
 
 void SpineItem::setSkeletonScale(const qreal &skeletonScale)
 {
-    if(m_isLoading)
+    if(m_requestDestroy || m_isLoading)
         return;
     m_skeletonScale = skeletonScale;
     if(isSkeletonReady()) {
@@ -806,6 +840,8 @@ void SpineItem::setSourceSize(const QSize &sourceSize)
 
 void SpineItem::updateBoundingRect()
 {
+    if(m_requestDestroy)
+        return;
     setSourceSize(QSize(m_boundingRect.width(), m_boundingRect.height()));
     if(m_hasViewPort)
         setImplicitSize(m_viewPortRect.width(), m_viewPortRect.height());
@@ -823,13 +859,19 @@ void SpineItem::onCacheRendered()
 
 void SpineItem::onVisibleChanged()
 {
-    if(isSkeletonReady() && isVisible())
+    if(isSkeletonReady() && isVisible() && !m_forceRenderOnHidden)
         emit animationUpdated();
+}
+
+void SpineItem::reloadResource()
+{
+    releaseSkeletonRelatedData();
+    loadResource();
 }
 
 bool SpineItem::isSkeletonReady() const
 {
-    return m_loaded && m_atlas && m_skeleton && m_animationState && m_spWorkerThread->isRunning();
+    return m_loaded && m_atlas && m_skeleton && m_animationState && m_spWorkerThread->isRunning() && !m_requestDestroy;
 }
 
 SpineItemWorker::SpineItemWorker(QObject *parent, SpineItem *spItem) :
@@ -855,7 +897,7 @@ void SpineItemWorker::updateSkeletonAnimation()
     }
     m_spItem->m_tickCounter.restart();
 
-    if(m_spItem->m_animationState->getTracks().size() <= 0 || !m_spItem->isVisible()) {
+    if(m_spItem->m_animationState->getTracks().size() <= 0 || (!m_spItem->isVisible() && !m_spItem->m_forceRenderOnHidden)) {
         if(m_fadecounter > 0)
             m_fadecounter--;
         else
@@ -881,8 +923,13 @@ void SpineItemWorker::updateSkeletonAnimation()
 
 void SpineItemWorker::loadResource()
 {
+    if(!m_spItem->isComponentComplete()) {
+        qWarning() << "Spine component is on created completly on qml, you should wait after component has been completed to load the spine resource...";
+        m_neadReloadResource = true;
+        m_reloadTimerID = startTimer(100);
+        return;
+    }
     m_spItem->releaseSkeletonRelatedData();
-    while(!m_spItem->m_componentCompleted) {QThread::msleep(100);}
     AimyTextureLoader::instance()->setWindow(m_spItem->window());
     m_spItem->m_isLoading = true;
 
@@ -891,6 +938,7 @@ void SpineItemWorker::loadResource()
     m_spItem->m_skins.clear();
     m_spItem->m_scaleX = 1.0;
     m_spItem->m_scaleY = 1.0;
+
     emit m_spItem->scaleXChanged(m_spItem->m_scaleX);
     emit m_spItem->scaleYChanged(m_spItem->m_scaleY);
     emit m_spItem->loadedChanged(m_spItem->m_loaded);
@@ -961,8 +1009,10 @@ void SpineItemWorker::loadResource()
     m_spItem->m_skeleton->updateWorldTransform();
     m_spItem->m_boundingRect = m_spItem->computeBoundingRect();
     m_spItem->batchRenderCmd();
+    QThread::msleep(1);
     emit m_spItem->animationUpdated();
-    QThread::msleep(20);
+    if(m_spItem->m_requestDestroy)
+        return;
     emit m_spItem->resourceReady();
 }
 
@@ -1075,4 +1125,15 @@ void SpineItemWorker::clearTrack(int trackIndex)
     m_spItem->m_animationState->clearTrack(size_t(trackIndex));
     if(m_spItem->m_animationState->getTracks().size() <= 0)
         m_spItem->m_animating = false;
+}
+
+void SpineItemWorker::timerEvent(QTimerEvent *event)
+{
+    qDebug() << "SpineItemWorker::timerEvent(QTimerEvent *event) " << m_reloadTimerID << event->timerId() << m_neadReloadResource;
+    if(m_reloadTimerID == event->timerId() && m_neadReloadResource){
+        m_neadReloadResource = false;
+        loadResource();
+        killTimer(m_reloadTimerID);
+        m_reloadTimerID = 0;
+    }
 }

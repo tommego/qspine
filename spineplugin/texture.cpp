@@ -36,11 +36,12 @@
 
 AimyTextureLoader::AimyTextureLoader()
 {
-
+    gTextureFreezed = false;
 }
 
 AimyTextureLoader::~AimyTextureLoader()
 {
+    gTextureFreezed = true;
     releaseTextures();
 }
 
@@ -52,6 +53,10 @@ AimyTextureLoader *AimyTextureLoader::instance()
 
 void AimyTextureLoader::load(spine::AtlasPage &page, const spine::String &path)
 {
+    if(gTextureFreezed) {
+        qWarning() << "Texture loader has been freezed: recreating new texture loader...";
+        AimyTextureLoader::instance();
+    }
     QMutexLocker locker(&m_mutex);
     QString filePath(path.buffer());
 

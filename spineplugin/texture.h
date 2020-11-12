@@ -40,6 +40,8 @@
 #include <QQuickWindow>
 #include <spine/spine.h>
 
+static bool gTextureFreezed = false;
+
 class QImage;
 
 struct Texture

@@ -62,6 +62,9 @@ class SpineItem : public QQuickFramebufferObject
     Q_PROPERTY(int blendColorChannel READ blendColorChannel WRITE setBlendColorChannel NOTIFY blendColorChannelChanged) // -1=none, 0=r, 1=g, 2=b, 3=a, 4=gray
     Q_PROPERTY(float light READ light WRITE setLight NOTIFY lightChanged)
     Q_PROPERTY(bool asynchronous READ asynchronous WRITE setAsynchronous NOTIFY asynchronousChanged)
+    Q_PROPERTY(bool forceRenderOnHidden READ forceRenderOnHidden WRITE setForceRenderOnHidden NOTIFY forceRenderOnHiddenChanged)
+
+    Q_INTERFACES(QQmlParserStatus)
 
 public:
     explicit SpineItem(QQuickItem *parent = nullptr);
@@ -194,6 +197,9 @@ public:
     bool asynchronous() const;
     void setAsynchronous(bool asynchronous);
 
+    bool forceRenderOnHidden() const;
+    void setForceRenderOnHidden(bool forceRenderOnHidden);
+
 signals:
 
     // property signals
@@ -221,6 +227,7 @@ signals:
     void blendColorChannelChanged(const int& channel);
     void lightChanged(const float& light);
     void asynchronousChanged(const bool& asynchronous);
+    void forceRenderOnHiddenChanged(const bool& forceRenderOnHidden);
 
     // rumtime signals
     void animationStarted(int trackId, QString animationName);
@@ -231,13 +238,15 @@ signals:
     void cacheRendered();
     void resourceReady();
 
-protected:
+public:
+    virtual void classBegin() override;
     virtual void componentComplete() override;
 
 private slots:
     void updateBoundingRect();
     void onCacheRendered();
     void onVisibleChanged();
+    void reloadResource();
 
 private:
     void loadResource();
@@ -293,6 +302,7 @@ private:
     bool m_requestDestroy = false;
     std::vector<RenderCmdBatch> m_batches;
     bool m_requestRender = false;
+    bool m_forceRenderOnHidden = false;
 };
 
 class SpineItemWorker: public QObject{
@@ -314,9 +324,14 @@ public slots:
     void clearTracks ();
     void clearTrack(int trackIndex = 0);
 
+protected:
+    void timerEvent(QTimerEvent *event) override;
+
 private:
     SpineItem* m_spItem = nullptr;
     int m_fadecounter = 1; // make sure last state textue has been render.
+    bool m_neadReloadResource = false;
+    int m_reloadTimerID = 0;
 };
 
 #endif // SPINEITEM_H
